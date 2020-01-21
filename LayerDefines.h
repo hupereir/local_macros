@@ -7,9 +7,9 @@
 constexpr int nDetectors = 6;
 constexpr int nLayersTotal = 57;
 
-const std::array<int, nDetectors> nLayers = {{ 3, 4, 16, 16, 16, 2 }};
-const std::array<int, nDetectors> firstLayer = {{ 0, 3, 7, 23, 39, 55 }};
-const std::array<float,nLayersTotal> radius = {{
+constexpr std::array<int, nDetectors> nLayers = {{ 3, 4, 16, 16, 16, 2 }};
+constexpr std::array<int, nDetectors> firstLayer = {{ 0, 3, 7, 23, 39, 55 }};
+constexpr std::array<float,nLayersTotal> radius = {{
   2.41, 3.17, 4.05, 9.01, 9.45, 11.25, 11.25, 30.15, 31.05, 31.95,
   31.95, 32.85, 33.75, 33.75, 34.65, 35.55, 35.55, 36.45, 37.35, 38.25,
   38.25, 39.15, 40.05, 40.95, 41.85, 42.75, 44.55, 45.45, 47.25, 48.15,

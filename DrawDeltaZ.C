@@ -22,55 +22,28 @@ void DrawDeltaZ()
   constexpr int nFiles = 5;
   const std::array<TString, nFiles> file =
   {
-    "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz11k_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_truth_notpc_nominal_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz3k_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz1k_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz500_highpt.root"
+    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz11k_highpt.root",
+    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nominal_highpt.root",
+    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz3k_highpt.root",
+    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz1k_highpt.root",
+    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz500_highpt.root"
   };
 
-  // constexpr bool single_layer = false;
-  const TString pdfFile = "Figures/DeltaZ_truth_notpc_nz_highpt-flat.pdf";
+  const TString pdfFile = "Figures/DeltaZ_truth_notpc_single_nz_highpt-flat.pdf";
 
+//
 //   constexpr int nFiles = 5;
 //   const std::array<TString, nFiles> file =
 //   {
-//     "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz11k.root",
-//     "Rootfiles/DeltaZ_truth_flat_truth_notpc_nominal.root",
-//     "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz3k.root",
-//     "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz1k.root",
-//     "Rootfiles/DeltaZ_truth_flat_truth_notpc_nz500.root"
+//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz11k_highpt.root",
+//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nominal_highpt.root",
+//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz3k_highpt.root",
+//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz1k_highpt.root",
+//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz500_highpt.root"
 //   };
 //
-//   // constexpr bool single_layer = false;
-//   const TString pdfFile = "Figures/DeltaZ_truth_notpc_nz-flat.pdf";
+//   const TString pdfFile = "Figures/DeltaZ_truth_notpc_nz_highpt-flat.pdf";
 
-//   constexpr int nFiles = 5;
-//   const std::array<TString, nFiles> file =
-//   {
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz11k.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nominal.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz3k.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz1k.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz500.root"
-//   };
-//
-//   // constexpr bool single_layer = false;
-//   const TString pdfFile = "Figures/DeltaZ_truth_notpc_nz-realistic.pdf";
-//
-//   constexpr int nFiles = 5;
-//   const std::array<TString, nFiles> file =
-//   {
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz11k.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nominal.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz3k.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz1k.root",
-//     "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz500.root"
-//   };
-//
-//  //   constexpr bool single_layer = true;
-//   const TString pdfFile = "Figures/DeltaZ_truth_notpc_single_nz-realistic.pdf";
-//
   PdfDocument pdfDocument( pdfFile );
 
   constexpr std::array<int, 5> color = { kBlue, kCyan+2, kGreen+2, kOrange+1, kRed };
@@ -111,9 +84,6 @@ void DrawDeltaZ()
     tg->SetMarkerStyle( symbol[i] );
     tg->SetMarkerColor( color[i] );
     tg->SetLineColor( color[i] );
-
-//     if( single_layer )
-//     { tg->Set( tg->GetN()-1 ); }
 
     tg->Draw( "P" );
 

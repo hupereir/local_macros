@@ -30,8 +30,8 @@ TString DeltaZ_truth( TString tag = TString() )
   if( tag.IsNull() ) tag = "_realistic_truth_notpc_single_nz500" ;
   const TString inputFile = Form( "DST/CONDOR%s/dst_eval%s*.root", tag.Data(), tag.Data() );
 
-  const TString pdfFile = Form( "Figures/DeltaZ_truth%s_highpt.pdf", tag.Data() );
-  const TString rootFile  = Form( "Rootfiles/DeltaZ_truth%s_highpt.root", tag.Data() );
+  const TString pdfFile = Form( "Figures/DeltaZ_truth%s.pdf", tag.Data() );
+  const TString rootFile  = Form( "Rootfiles/DeltaZ_truth%s.root", tag.Data() );
 
   std::cout << "DeltaZ_truth - inputFile: " << inputFile << std::endl;
   std::cout << "DeltaZ_truth - pdfFile: " << pdfFile << std::endl;
@@ -49,8 +49,7 @@ TString DeltaZ_truth( TString tag = TString() )
   // variable names
   const TString var( "_clusters._trk_z - _clusters._truth_z" );
   const TString var2d = Form( "%s:_clusters._layer", var.Data() );
-  TCut momentum_cut( "_clusters._truth_pt>6" );
-  // TCut momentum_cut;
+  TCut momentum_cut;
 
   // create TGraph to store resolution vs layer
   auto tg = new TGraphErrors();

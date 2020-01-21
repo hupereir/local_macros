@@ -17,7 +17,7 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 #include "Fit.C"
 
 //____________________________________________________________________________
-Float_t DeltaPhi( Float_t phi )
+float DeltaPhi( float phi )
 {
   if( phi >= 2*M_PI ) return phi - 2*M_PI;
   else if( phi <= -2*M_PI ) return phi + 2*M_PI;
@@ -31,16 +31,13 @@ TString DeltaRPhi_truth( TString tag = TString() )
   set_style( false );
 
   // initial guess for max residuals
-  std::array<Float_t, nDetectors> max_det_residual = { 0.003, 0.01, 1.2, 1.2, 1.2, 1.5};
+  std::array<float, nDetectors> max_det_residual = { 0.003, 0.01, 1.2, 1.2, 1.2, 1.5};
 
-//   if( tag.IsNull() ) tag = "_1k_truth_notpc_nphi1k" ;
-//   const TString inputFile = Form( "DST/dst_eval%s.root", tag.Data() );
-
-  if( tag.IsNull() ) tag = "_flat_truth_notpc_nominal" ;
+  if( tag.IsNull() ) tag = "_flat_full_notpc_single_nphi1k_highpt" ;
   const TString inputFile = Form( "DST/CONDOR%s/dst_eval%s*.root", tag.Data(), tag.Data() );
 
-  const TString pdfFile = Form( "Figures/DeltaRPhi_truth%s_highpt.pdf", tag.Data() );
-  const TString rootFile  = Form( "Rootfiles/DeltaRPhi_truth%s_highpt.root", tag.Data() );
+  const TString pdfFile = Form( "Figures/DeltaRPhi_truth%s.pdf", tag.Data() );
+  const TString rootFile  = Form( "Rootfiles/DeltaRPhi_truth%s.root", tag.Data() );
 
   std::cout << "DeltaRPhi_truth - inputFile: " << inputFile << std::endl;
   std::cout << "DeltaRPhi_truth - pdfFile: " << pdfFile << std::endl;
@@ -48,7 +45,7 @@ TString DeltaRPhi_truth( TString tag = TString() )
   PdfDocument pdfDocument( pdfFile );
 
   // configuration
-  const bool doFit = true;
+  const bool do_fit = true;
 
   // file manager
   FileManager fileManager( inputFile );
@@ -58,10 +55,7 @@ TString DeltaRPhi_truth( TString tag = TString() )
   // variable names
   const TString var( "_clusters._trk_r*DeltaPhi(_clusters._trk_phi - _clusters._truth_phi)" );
   const TString var2d = Form( "%s:_clusters._layer", var.Data() );
-  TCut momentum_cut( "_clusters._truth_pt>6" );
-  // TCut momentum_cut( "_clusters._truth_pt<5" );
-  // TCut momentum_cut( "_clusters._truth_pt>1" );
-  // TCut momentum_cut;
+  const TCut momentum_cut;
 
   // create TGraph to store resolution vs layer
   auto tg = new TGraphErrors();
@@ -74,6 +68,7 @@ TString DeltaRPhi_truth( TString tag = TString() )
   // optimize max residual
   for( int idet = 0; idet < nDetectors; ++idet )
   {
+
     const TString hname( Form( "deltarphi_%i_0", idet ) );
     const TCut layer_cut( Form( "_clusters._layer==%i", firstLayer[idet]+1 ) );
 
@@ -84,8 +79,6 @@ TString DeltaRPhi_truth( TString tag = TString() )
       max_det_residual[idet] = 5*h1->GetRMS();
 
     }
-
-    // max_det_residual[idet] = 8*max_det_residual[idet]/5;
 
   }
 
@@ -125,7 +118,7 @@ TString DeltaRPhi_truth( TString tag = TString() )
       // fit
       if( h->GetEntries() )
       {
-        if( doFit )
+        if( do_fit )
         {
           const auto result = std::min( Fit( h ), Fit_box( h ) );
           auto f = result._function;
@@ -144,11 +137,15 @@ TString DeltaRPhi_truth( TString tag = TString() )
 
         } else {
 
-          tgl->SetPoint( layerIndex, layerIndex, h->GetRMS()*1e4 );
-          tgl->SetPointError( layerIndex, 0, h->GetRMSError()*1e4 );
+          auto rms = h->GetRMS();
+          auto error = h->GetRMSError(2);
+          Draw::PutText( 0.2, 0.8, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
 
-          tg->SetPoint( layerIndex, radius[layerIndex], h->GetRMS()*1e4 );
-          tg->SetPointError( layerIndex, 0, h->GetRMSError()*1e4 );
+          tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
+          tgl->SetPointError( layerIndex, 0, error*1e4 );
+
+          tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
+          tg->SetPointError( layerIndex, 0, error*1e4 );
 
         }
       }

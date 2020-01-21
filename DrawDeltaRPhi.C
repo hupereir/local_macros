@@ -22,57 +22,27 @@ void DrawDeltaRPhi()
   constexpr int nFiles = 5;
   const std::array<TString, nFiles> file =
   {
-    "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi20k_highpt.root",
-    "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nominal_highpt.root",
-    "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi5k_highpt.root",
-    "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi2k_highpt.root",
-    "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi1k_highpt.root"
+    "Rootfiles/DeltaRPhi_truth_flat_full_notpc_single_nphi20k_highpt.root",
+    "Rootfiles/DeltaRPhi_truth_flat_full_notpc_single_nominal_highpt.root",
+    "Rootfiles/DeltaRPhi_truth_flat_full_notpc_single_nphi5k_highpt.root",
+    "Rootfiles/DeltaRPhi_truth_flat_full_notpc_single_nphi2k_highpt.root",
+    "Rootfiles/DeltaRPhi_truth_flat_full_notpc_single_nphi1k_highpt.root"
   };
 
-//   constexpr bool single_layer = false;
-  const TString pdfFile = "Figures/DeltaRPhi_truth_notpc_nphi_highpt-flat.pdf";
+  const TString pdfFile = "Figures/DeltaRPhi_truth_notpc_single_nphi_highpt-flat.pdf";
   PdfDocument pdfDocument( pdfFile );
 
 //   constexpr int nFiles = 5;
 //   const std::array<TString, nFiles> file =
 //   {
-//     "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi20k.root",
-//     "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nominal.root",
-//     "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi5k.root",
-//     "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi2k.root",
-//     "Rootfiles/DeltaRPhi_truth_flat_truth_notpc_nphi1k.root"
+//     "Rootfiles/DeltaRPhi_truth_flat_full_notpc_nphi20k_highpt.root",
+//     "Rootfiles/DeltaRPhi_truth_flat_full_notpc_nominal_highpt.root",
+//     "Rootfiles/DeltaRPhi_truth_flat_full_notpc_nphi5k_highpt.root",
+//     "Rootfiles/DeltaRPhi_truth_flat_full_notpc_nphi2k_highpt.root",
+//     "Rootfiles/DeltaRPhi_truth_flat_full_notpc_nphi1k_highpt.root"
 //   };
 //
-// //   constexpr bool single_layer = false;
-//   const TString pdfFile = "Figures/DeltaRPhi_truth_notpc_nphi-flat.pdf";
-//   PdfDocument pdfDocument( pdfFile );
-
-//   constexpr int nFiles = 5;
-//   const std::array<TString, nFiles> file =
-//   {
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_nphi20k.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_nominal.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_nphi5k.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_nphi2k.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_nphi1k.root"
-//   };
-//
-// //   constexpr bool single_layer = false;
-//   const TString pdfFile = "Figures/DeltaRPhi_truth_notpc_nphi-realistic.pdf";
-//   PdfDocument pdfDocument( pdfFile );
-
-//   constexpr int nFiles = 5;
-//   const std::array<TString, nFiles> file =
-//   {
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_single_nphi20k.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_single_nominal.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_single_nphi5k.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_single_nphi2k.root",
-//     "Rootfiles/DeltaRPhi_truth_realistic_truth_notpc_single_nphi1k.root"
-//   };
-
-// //   constexpr bool single_layer = true;
-//   const TString pdfFile = "Figures/DeltaRPhi_truth_notpc_single_nphi-realistic.pdf";
+//   const TString pdfFile = "Figures/DeltaRPhi_truth_notpc_nphi_highpt-flat.pdf";
 //   PdfDocument pdfDocument( pdfFile );
 
   constexpr std::array<int, 5> color = { kBlue, kCyan+2, kGreen+2, kOrange+1, kRed };
@@ -111,9 +81,6 @@ void DrawDeltaRPhi()
     tg->SetMarkerStyle( symbol[i] );
     tg->SetMarkerColor( color[i] );
     tg->SetLineColor( color[i] );
-
-//     if( single_layer )
-//     { tg->Set( tg->GetN()-1 ); }
 
     tg->Draw( "P" );
 
