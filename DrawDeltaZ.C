@@ -1,6 +1,7 @@
 #include <RootUtil/Draw.h>
 #include <RootUtil/FileManager.h>
 #include <RootUtil/PdfDocument.h>
+#include <RootUtil/Stream.h>
 #include <RootUtil/Utils.h>
 
 #include <TFile.h>
@@ -19,42 +20,56 @@ void DrawDeltaZ()
   gStyle->SetOptStat(0);
   gStyle->SetOptFit(0);
 
-  constexpr int nFiles = 5;
+  #if false
+  constexpr int nFiles = 9;
   const std::array<TString, nFiles> file =
   {
-    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz11k_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nominal_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz3k_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz1k_highpt.root",
-    "Rootfiles/DeltaZ_truth_flat_full_notpc_single_nz500_highpt.root"
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz11k.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nominal.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz3k.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz1k.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz500.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz300.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz100.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz50.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_nz10.root"
   };
 
-  const TString pdfFile = "Figures/DeltaZ_truth_notpc_single_nz_highpt-flat.pdf";
+  const TString pdfFile = "Figures/DeltaZ_truth_realistic_truth_notpc_nz.pdf";
 
-//
-//   constexpr int nFiles = 5;
-//   const std::array<TString, nFiles> file =
-//   {
-//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz11k_highpt.root",
-//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nominal_highpt.root",
-//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz3k_highpt.root",
-//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz1k_highpt.root",
-//     "Rootfiles/DeltaZ_truth_flat_full_notpc_nz500_highpt.root"
-//   };
-//
-//   const TString pdfFile = "Figures/DeltaZ_truth_notpc_nz_highpt-flat.pdf";
+  #else
 
-  PdfDocument pdfDocument( pdfFile );
-
-  constexpr std::array<int, 5> color = { kBlue, kCyan+2, kGreen+2, kOrange+1, kRed };
-  constexpr std::array<int, 5> symbol = { 20, 20, 20, 20, 20 };
-  const std::array<TString, 5> label =
+  constexpr int nFiles = 9;
+  const std::array<TString, nFiles> file =
   {
-    "n_{z}=11k, #sigma_{z}=40 #mum",
-    "n_{z}=5k, #sigma_{z}=100 #mum",
-    "n_{z}=3k, #sigma_{z}= 220 #mum",
-    "n_{z}=1k, #sigma_{z}=560 #mum",
-    "n_{z}=500, #sigma_{z}=1.2 mm"
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz11k.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nominal.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz3k.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz1k.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz500.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz300.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz100.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz50.root",
+    "Rootfiles/DeltaZ_truth_realistic_truth_notpc_single_nz10.root"
+  };
+
+  const TString pdfFile = "Figures/DeltaZ_truth_realistic_truth_notpc_single_nz.pdf";
+
+  #endif
+
+  constexpr std::array<int, nFiles> color = { kBlue, kCyan+2, kGreen+2, kOrange+1, kRed, kBlue, kCyan+2, kGreen+2, kOrange+1 };
+  constexpr std::array<int, nFiles> symbol = { 20, 20, 20, 20, 20, 21, 21, 21, 21 };
+  const std::array<TString, nFiles> label =
+  {
+    "N_{z}=11k, #sigma^{OT}_{z}=40 #mum",
+    "N_{z}=5k, #sigma^{OT}_{z}=100 #mum",
+    "N_{z}=3k, #sigma^{OT}_{z}= 220 #mum",
+    "N_{z}=1k, #sigma^{OT}_{z}=560 #mum",
+    "N_{z}=500, #sigma^{OT}_{z}=1.2 mm",
+    "N_{z}=300, #sigma^{OT}_{z}=2.3 mm",
+    "N_{z}=100, #sigma^{OT}_{z}=6 mm",
+    "N_{z}=50, #sigma^{OT}_{z}=12 mm",
+    "N_{z}=10, #sigma^{OT}_{z}=60 mm"
   };
 
   const TString cvName( "cv" );
@@ -64,18 +79,19 @@ void DrawDeltaZ()
   // auto h = new TH1F( "dummy", "", 100, 0, 90 );
   auto h = new TH1F( "dummy", "", 100, 20, 80 );
   h->SetMinimum(0);
-  // h->SetMaximum(12.5e2);
-  h->SetMaximum(5.5e2);
+  h->SetMaximum(5000);
   h->GetXaxis()->SetTitle( "r (cm)" );
   h->GetYaxis()->SetTitle( "#sigma_{#Deltaz} (track-truth) (#mum)" );
   h->GetYaxis()->SetTitleOffset( 1.4 );
+  h->GetYaxis()->SetMaxDigits(3);
   h->Draw();
 
-  auto legend = new TLegend( 0.16, 0.6, 0.60, 0.9, "", "NDC" );
+  auto legend = new TLegend( 0.16, 0.48, 0.60, 0.93, "", "NDC" );
   legend->SetFillColor(0);
   legend->SetFillStyle(0);
   legend->SetBorderSize(0);
-  legend->Draw();
+
+  std::vector<double> maximumList;
 
   for( int i = 0; i < nFiles; ++i )
   {
@@ -89,8 +105,27 @@ void DrawDeltaZ()
 
     legend->AddEntry( tg, label[i], "AP" );
 
+    // get the maximum in the tpc
+    double maximum = 0;
+    for( int ip = 0; ip < tg->GetN(); ++ip )
+    {
+      double r, sigma;
+      tg->GetPoint( ip, r, sigma );
+      if( r < rmin_tpc || r > rmax_tpc ) continue;
+      if( sigma > maximum ) maximum = sigma;
+    }
+
+    std::cout << "DrawDeltaZ - file: " << file[i] << " maximum: " << maximum << std::endl;
+
+    maximumList.push_back( maximum );
+
   }
 
-  pdfDocument.Add( cv );
+  legend->Draw();
+
+  // print maximum values
+  Stream::PrintVector( "double", "residuals", maximumList, "%.0f" );
+
+  cv->SaveAs( pdfFile );
 
 }

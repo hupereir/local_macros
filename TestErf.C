@@ -14,6 +14,9 @@ Double_t FitFunction( Double_t* x, Double_t* par )
 void TestErf( void )
 {
 
+  
+  std::cout << "TestErf - inf: " << std::erf( -1e5) << std::endl;
+  
   TF1* f = new TF1( "fitFunction", FitFunction, -10, 10, 4 );
   f->SetParameters( 1, 0, 0, 5 );
   // f->Draw();

@@ -19,22 +19,23 @@ TString DeltaZ_cluster( TString tag = TString() )
 {
 
   set_style( false );
-  constexpr std::array<Float_t, nDetectors> maxDetResidual = { 0.003, 1, 0.3, 0.3, 0.3, 0.5 };
-  auto maxResidual = *std::max_element( maxDetResidual.cbegin(), maxDetResidual.cend() )/3;
 
-  // pdf output
-  if( tag.IsNull() ) tag = "_1k_full_notpc_nz500" ;
-  const TString inputFile = Form( "DST/dst_eval%s.root", tag.Data() );
+  // initial guess for max residuals
+  std::array<float, nDetectors> max_det_residual = { 0.003, 5, 1.2, 1.2, 1.2, 0.1, 0.1};
+
+  if( tag.IsNull() ) tag = "_truth_notpc";
+  const TString inputFile = Form( "DST/CONDOR_realistic_micromegas/dst_reco%s/dst_reco_realistic_micromegas_1?.root", tag.Data() );
+
   const TString pdfFile = Form( "Figures/DeltaZ_cluster%s.pdf", tag.Data() );
+  const TString rootFile  = Form( "Rootfiles/DeltaZ_cluster%s.root", tag.Data() );
 
-  std::cout << "DeltaZ - inputFile: " << inputFile << std::endl;
-  std::cout << "DeltaZ - pdfFile: " << pdfFile << std::endl;
+  std::cout << "DeltaZ_cluster - inputFile: " << inputFile << std::endl;
+  std::cout << "DeltaZ_cluster - pdfFile: " << pdfFile << std::endl;
 
   PdfDocument pdfDocument( pdfFile );
 
   // configuration
-  const bool doFit = false;
-  const int firstBoxLayer = 55;
+  const bool do_fit = true;
 
   // file manager
   FileManager fileManager( inputFile );
@@ -42,22 +43,82 @@ TString DeltaZ_cluster( TString tag = TString() )
   if( !tree ) return TString();
 
   // variable names
+  #define USE_TRACKS
+  #ifdef USE_TRACKS
+  const TString var( "_tracks._clusters._z - _tracks._clusters._truth_z" );
+  const TString var2d = Form( "%s:_tracks._clusters._layer", var.Data() );
+  // const TCut cluster_cut( "_clusters._size == 1" );
+  const TCut cluster_cut( "_tracks._clusters._z > 0" );
+  #else
   const TString var( "_clusters._z - _clusters._truth_z" );
   const TString var2d = Form( "%s:_clusters._layer", var.Data() );
   // const TCut cluster_cut( "_clusters._size == 1" );
-  const TCut cluster_cut;
+  const TCut cluster_cut( "_clusters._z > 0" );
+  #endif
+  const TCut momentum_cut;
+
+  // create TGraph to store resolution vs layer
+  auto tg = new TGraphErrors();
+  tg->SetName( "residuals" );
+
+  // create TGraph to store resolution vs radius
+  auto tgl = new TGraphErrors();
+  tgl->SetName( "residuals_layers" );
+
+
+  // create TGraph to store resolution vs layer
+  auto tgm = new TGraphErrors();
+  tg->SetName( "residuals mean" );
+
+  // create TGraph to store resolution vs radius
+  auto tgml = new TGraphErrors();
+  tgml->SetName( "residuals_layers mean" );
+
+  
+  // optimize max residual
+  for( int idet = 0; idet < nDetectors; ++idet )
+  {
+
+    // skip detector 5, which is phi segmented micromegas
+    if( idet == 5 ) continue;
+
+    const TString hname( Form( "deltarphi_%i_0", idet ) );
+
+    #ifdef USE_TRACKS
+    const TCut layer_cut( Form( "_tracks._clusters._layer==%i", firstLayer[idet] ) );
+    #else
+    const TCut layer_cut( Form( "_clusters._layer==%i", firstLayer[idet] ) );
+    #endif
+
+    for( int i=0; i<3; ++i )
+    {
+      std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_det_residual[idet], max_det_residual[idet] ) );
+      Utils::TreeToHisto( tree, hname, var, momentum_cut&&layer_cut, false );
+      max_det_residual[idet] = 5*h1->GetRMS() + std::abs(h1->GetMean() );
+    }
+
+  }
+
+  // save all histograms
+  std::array<std::unique_ptr<TH1>, nLayersTotal> h_array;
 
   // loop over detectors
   for( int idet = 0; idet < nDetectors; ++idet )
   {
+
+    std::cout << "DeltaZ_cluster - detector " << idet << " max_det_residual: " << max_det_residual[idet] << std::endl;
+    
+    // skip detector 5, which is phi segmented micromegas
+    if( idet == 5 ) continue;
+
     const TString hname( Form( "deltaz_%i", idet ) );
-    std::unique_ptr<TH2> h2d( new TH2F( hname, "", nLayers[idet], firstLayer[idet], firstLayer[idet] + nLayers[idet], 100, -maxDetResidual[idet], maxDetResidual[idet] ) );
-    Utils::TreeToHisto( tree, hname, var2d, cluster_cut, false );
+    std::unique_ptr<TH2> h2d( new TH2F( hname, "", nLayers[idet], firstLayer[idet], firstLayer[idet] + nLayers[idet], 100, -max_det_residual[idet], max_det_residual[idet] ) );
+    Utils::TreeToHisto( tree, hname, var2d, cluster_cut&&momentum_cut, false );
 
     // create canvas
     const TString cvName = Form( "cv_%i", idet );
-    auto cv = new TCanvas( cvName, cvName, 800, 800 );
-    Draw::DivideCanvas( cv, nLayers[idet], false );
+    std::unique_ptr<TCanvas> cv( new TCanvas( cvName, cvName, 800, (idet == 0 ) ? 400:800 ) );
+    Draw::DivideCanvas( cv.get(), nLayers[idet], false );
 
     // loop over layers
     for( int ilayer = 0; ilayer < nLayers[idet]; ++ilayer )
@@ -65,34 +126,85 @@ TString DeltaZ_cluster( TString tag = TString() )
 
       int layerIndex = firstLayer[idet] + ilayer;
       const auto hname = Form( "h_%i", layerIndex );
-      TH1* h = h2d->ProjectionY( hname, ilayer+1, ilayer+1 );
+      std::unique_ptr<TH1> h( h2d->ProjectionY( hname, ilayer+1, ilayer+1 ) );
       h->SetTitle( hname );
       h->SetLineColor( 1 );
       h->SetMarkerColor( 1 );
       h->GetXaxis()->SetTitle( "#Deltaz_{cluster-truth} (cm)" );
-      h->GetXaxis()->SetRangeUser( -maxDetResidual[idet], maxDetResidual[idet] );
+      h->GetXaxis()->SetRangeUser( -max_det_residual[idet], max_det_residual[idet] );
       h->SetMaximum( h->GetMaximum()*1.2 );
 
       cv->cd( ilayer+1 );
       h->Draw();
 
-      // fit
-      if( h->GetEntries() )
+      if( idet == 0 )
       {
-        if( doFit )
+        h->GetXaxis()->SetMaxDigits( 2 );
+        gPad->SetRightMargin( 0.12 );
+      }
+
+      // fit
+      const auto entries( h->GetEntries() );
+      std::cout << "DeltaRPhi_cluster - layer: " << layerIndex << " entries: " << entries << std::endl;
+      if( entries )
+      {
+        if( do_fit )
         {
-          auto f = (firstBoxLayer>=0 && layerIndex>=firstBoxLayer) ? Fit_box( h ):Fit( h );
-          auto h = f->GetHistogram();
-          auto rms = h->GetRMS();
-          auto error = f->GetParError(2);
 
-          Draw::PutText( 0.2, 0.8, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+          const auto result = idet == 6 ?
+            Fit_double(h.get()):
+            std::min( Fit(h.get()), Fit_box(h.get()) );
+
+//           const auto result = std::min( Fit(h.get()), Fit_box(h.get()) );
+
+          if( result._valid )
+          {
+            auto f = result._function;
+            f->Draw("same");
+            auto h = f->GetHistogram();
+
+            auto mean = f->GetParameter(1);
+            auto meanError = f->GetParError(1);
+            Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+
+            tgml->SetPoint( layerIndex, layerIndex, mean );
+            tgml->SetPointError( layerIndex, 0, meanError );
+
+            tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+            tgm->SetPointError( layerIndex, 0, meanError );
+
+            auto rms = h->GetRMS();
+            auto error = f->GetParError(2);
+            Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+
+            tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
+            tgl->SetPointError( layerIndex, 0, error*1e4 );
+
+            tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
+            tg->SetPointError( layerIndex, 0, error*1e4 );
+          } else {
+            std::cout << "DeltaZ - skipping layer " << layerIndex << " (failed fit)" << std::endl;
+          }
         } else {
+          auto mean = h->GetMean();
+          auto meanError = h->GetMeanError();
+          Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+
+          tgml->SetPoint( layerIndex, layerIndex, mean );
+          tgml->SetPointError( layerIndex, 0, meanError );
+          
+          tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+          tgm->SetPointError( layerIndex, 0, meanError );
 
           auto rms = h->GetRMS();
-          auto error = h->GetRMSError(2);
-          Draw::PutText( 0.2, 0.8, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+          auto error = h->GetRMSError();
+          Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
 
+          tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
+          tgl->SetPointError( layerIndex, 0, error*1e4 );
+
+          tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
+          tg->SetPointError( layerIndex, 0, error*1e4 );
         }
       }
 
@@ -100,14 +212,106 @@ TString DeltaZ_cluster( TString tag = TString() )
       gPad->Update();
       Draw::VerticalLine( gPad, 0 )->Draw();
 
+      // save in array
+      h_array[layerIndex] = std::move(h);
     }
 
     cv->Update();
     cv->cd(0);
-    pdfDocument.Add( cv );
+    pdfDocument.Add( cv.get() );
 
   }
 
+  // RMS tgraph
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
+    h->SetMinimum(0);
+    h->SetMaximum(1.2*Utils::GetMaximum(tgl));
+    h->GetXaxis()->SetTitle( "layer id" );
+    h->GetYaxis()->SetTitle( "#sigma_{z} (cluster-truth) (#mum)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgl->SetMarkerStyle(20);
+    tgl->SetLineColor(1);
+    tgl->SetMarkerColor(1);
+    tgl->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+
+  // RMS tgraph
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
+    h->SetMinimum(0);
+    h->SetMaximum(1.2*Utils::GetMaximum(tg));
+    h->GetXaxis()->SetTitle( "r (cm)" );
+    h->GetYaxis()->SetTitle( "#sigma_{z} (cluster-truth) (#mum)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tg->SetMarkerStyle(20);
+    tg->SetLineColor(1);
+    tg->SetMarkerColor(1);
+    tg->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+
+  // mean tgraph
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
+    h->SetMinimum(-0.04);
+    h->SetMaximum(0.04);
+    h->GetXaxis()->SetTitle( "layer id" );
+    h->GetYaxis()->SetTitle( "#LT#Deltaz#GT (cluster-truth) (#mum)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgml->SetMarkerStyle(20);
+    tgml->SetLineColor(1);
+    tgml->SetMarkerColor(1);
+    tgml->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+
+  // Mean tgraph
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
+    h->SetMinimum(-0.04);
+    h->SetMaximum(0.04);
+    h->GetXaxis()->SetTitle( "r (cm)" );
+    h->GetYaxis()->SetTitle( "#LT#Deltaz#GT (cluster-truth) (#mum)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgm->SetMarkerStyle(20);
+    tgm->SetLineColor(1);
+    tgm->SetMarkerColor(1);
+    tgm->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+  // save everything in rootfiles
+  std::unique_ptr<TFile> output( TFile::Open( rootFile, "RECREATE" ) );
+  output->cd();
+  for( auto&& h:h_array) { if(h) h->Write(); }
+  tgl->Write();
+  tg->Write();
+  output->Close();
   return pdfFile;
 
 }

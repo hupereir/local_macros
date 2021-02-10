@@ -18,15 +18,16 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 #include "Fit.C"
 
 //____________________________________________________________________________
-void Radius()
+TString Radius( TString tag = TString() )
 {
 
   gStyle->SetOptStat(0);
   gStyle->SetOptFit(0);
 
   // pdf output
-  const TString tag = "_5k_full" ;
-  const TString inputFile = Form( "DST/dst_eval%s.root", tag.Data() );
+  // if( tag.IsNull() ) tag = "_realistic_truth_notpc_noouter" ;
+  if( tag.IsNull() ) tag = "_flat_full_notpc_nominal_highpt" ;
+  const TString inputFile = Form( "DST/CONDOR%s/dst_eval%s*.root", tag.Data(), tag.Data() );
   const TString pdfFile = Form( "Figures/Radius%s.pdf", tag.Data() );
   PdfDocument pdfDocument( pdfFile );
 
@@ -43,7 +44,7 @@ void Radius()
 
   const float maxRadius = 90;
   const TString hName( "radius" );
-  std::unique_ptr<TH2> h2d( new TH2F( hName, "", nLayersTotal, 0, nLayersTotal, 100, 0, maxRadius ) );
+  std::unique_ptr<TH2> h2d( new TH2F( hName, "", nLayersTotal, 0, nLayersTotal, maxRadius*100, 0, maxRadius ) );
   Utils::TreeToHisto( tree, hName, var2d, TCut(), kFALSE );
 
   std::vector<float> layerRadius;
@@ -112,5 +113,5 @@ void Radius()
 
   // print
   Stream::PrintVector( "radius", layerRadius, "%.2f" );
-
+  return pdfFile;
 }

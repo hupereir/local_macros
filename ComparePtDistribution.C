@@ -11,6 +11,14 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 template< class T > T square( const T& x ) { return x*x; }
 
 //___________________________________________
+double integral( TH1* h, double xmin )
+{
+  const int bin1 = h->GetXaxis()->FindBin( xmin );
+  const int bin2 = h->GetNbinsX();
+  return h->Integral( bin1, bin2 );
+}
+
+//___________________________________________
 void ComparePtDistribution()
 {
 
@@ -42,27 +50,29 @@ void ComparePtDistribution()
 
   // open DST
   // const TString inputFile = "DST/dst_eval_1k_realistic2_truth_notpc_*.root";
-  const TString inputFile = "DST/CONDOR_realistic_*/dst_eval_realistic_truth_notpc_*.root";
+  // const TString inputFile = "DST/CONDOR_realistic_*/dst_eval_realistic_truth_notpc_*.root";
+  const TString inputFile = "DST/CONDOR_realistic_truth_notpc_noouter/dst_eval*.root";
   FileManager fileManager( inputFile );
   auto tree = fileManager.GetChain( "T" );
   if( !tree ) return;
 
   // variable names
+  const TCut momentumCut;
   const TString var( "_mc_tracks._pt" );
   auto h1 = new TH1F( "h1", "", 100, 0, 10 );
-  Utils::TreeToHisto( tree, h1->GetName(), var, TCut(), false );
+  Utils::TreeToHisto( tree, h1->GetName(), var, momentumCut, false );
 
   auto cv = new TCanvas( "cv", "cv", 800, 800 );
   h->SetMarkerStyle(20);
   h->SetMarkerColor(1);
-  h->Scale( 1.0/h->Integral() );
+  h->Scale( 1.0/integral( h, 0.5 ) );
   h->Draw( "E" );
   h->GetXaxis()->SetTitle( "#it{p}_{T} (Gev/#it{c})" );
 
   h1->SetMarkerStyle(20);
   h1->SetMarkerColor(2);
   h1->SetLineColor(2);
-  h1->Scale( 1.0/h1->Integral() );
+  h1->Scale( 1.0/integral( h1, 0.5 ) );
   h1->Draw( "E Same" );
 
 

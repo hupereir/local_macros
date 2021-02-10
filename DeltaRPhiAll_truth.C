@@ -5,17 +5,36 @@ void DeltaRPhiAll_truth()
 
   const auto tags =
   {
-    "_flat_full_notpc_single_nphi20k_highpt",
-    "_flat_full_notpc_single_nominal_highpt",
-    "_flat_full_notpc_single_nphi5k_highpt",
-    "_flat_full_notpc_single_nphi2k_highpt",
-    "_flat_full_notpc_single_nphi1k_highpt"
+//     "_realistic_full_notpc_nphi20k",
+//     "_realistic_full_notpc_nominal",
+//     "_realistic_full_notpc_nphi5k",
+//     "_realistic_full_notpc_nphi2k",
+//     "_realistic_full_notpc_nphi1k",
+//     "_realistic_full_notpc_nphi500",
+//     "_realistic_full_notpc_nphi200",
+//     "_realistic_full_notpc_nphi100",
+//     "_realistic_full_notpc_nphi50",
+//
+//     "_realistic_truth_notpc_nphi20k",
+//     "_realistic_truth_notpc_nominal",
+//     "_realistic_truth_notpc_nphi5k",
+//     "_realistic_truth_notpc_nphi2k",
+//     "_realistic_truth_notpc_nphi1k",
+//     "_realistic_truth_notpc_nphi500",
+//     "_realistic_truth_notpc_nphi200",
+//     "_realistic_truth_notpc_nphi100",
+//     "_realistic_truth_notpc_nphi50"
 
-//     "_flat_full_notpc_nphi20k_highpt",
-//     "_flat_full_notpc_nominal_highpt",
-//     "_flat_full_notpc_nphi5k_highpt",
-//     "_flat_full_notpc_nphi2k_highpt",
-//     "_flat_full_notpc_nphi1k_highpt"
+//     "_realistic_truth_notpc_single_nphi20k",
+//     "_realistic_truth_notpc_single_nominal",
+    "_realistic_truth_notpc_single_nphi5k",
+    "_realistic_truth_notpc_single_nphi2k",
+    "_realistic_truth_notpc_single_nphi1k",
+    "_realistic_truth_notpc_single_nphi500",
+    "_realistic_truth_notpc_single_nphi200",
+    "_realistic_truth_notpc_single_nphi100",
+    "_realistic_truth_notpc_single_nphi50"
+
   };
 
   std::vector<TString> outputFiles;

@@ -21,8 +21,8 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 //____________________________________________________________________________
 Float_t DeltaPhi( Float_t phi )
 {
-  if( phi >= 2*M_PI ) return phi - 2*M_PI;
-  else if( phi <= -2*M_PI ) return phi + 2*M_PI;
+  if( phi >= M_PI ) return phi - 2*M_PI;
+  else if( phi < -M_PI ) return phi + 2*M_PI;
   else return phi;
 }
 
@@ -39,9 +39,11 @@ TString DeltaRPhiInvMomentum_truth( TString tag = TString() )
   const int layer = 7;
   const auto maxResidual = 0.5;
 
-  // pdf output
-  if( tag.IsNull() ) tag = "_5k_truth_low_momentum_notpc_noouter" ;
-  const TString inputFile = Form( "DST_afs/dst_eval%s.root", tag.Data() );
+  if( tag.IsNull() ) tag = "_flat_full_notpc_noouter" ;
+  const TString inputFile = Form( "DST/CONDOR%s/dst%s*.root", tag.Data(), tag.Data() );
+
+//   if( tag.IsNull() ) tag = "_5k_truth_low_momentum_notpc_noouter" ;
+//   const TString inputFile = Form( "DST_afs/dst_eval%s.root", tag.Data() );
   const TString pdfFile = Form( "Figures/DeltaRPhiInvMomentum_truth%s_%i.pdf", tag.Data(), layer );
 
   std::cout << "DeltaRPhi_truth - inputFile: " << inputFile << std::endl;
@@ -84,7 +86,8 @@ TString DeltaRPhiInvMomentum_truth( TString tag = TString() )
     cv->cd( ibin+1 );
     h->Draw();
 
-    auto f = Fit( h );
+    const auto result = std::min( Fit( h ), Fit_box( h ) );
+    auto f = result._function;
     Draw::PutText( 0.2, 0.8, Form( "#sigma = %.3g #pm %.3g #mum", f->GetParameter(2)*1e4, f->GetParError(2)*1e4 ) );
     tg->SetPoint( ibin, h2d->GetXaxis()->GetBinCenter( ibin+1 ), f->GetParameter(2)*1e4 );
     tg->SetPointError( ibin, 0, f->GetParError(2)*1e4 );

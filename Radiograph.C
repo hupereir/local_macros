@@ -27,8 +27,8 @@ void Radiograph()
   gStyle->SetOptFit(0);
 
   // pdf output
-  const TString tag = "_5k_full" ;
-  const TString inputFile = Form( "DST/dst_eval%s.root", tag.Data() );
+  const TString tag = "_realistic_micromegas_config3";
+  const TString inputFile = Form( "DST/CONDOR%s/dst_eval%s*.root", tag.Data(), tag.Data() );
   const TString pdfFile = Form( "Figures/Radiograph%s.pdf", tag.Data() );
   PdfDocument pdfDocument( pdfFile );
 
@@ -41,7 +41,7 @@ void Radiograph()
 
   // variable names
   {
-    const TString var( "_y:_x" );
+    const TString var( "_clusters._truth_y:_clusters._truth_x" );
     const TString hName = "radiograph";
     auto h2d = new TH2F( hName, "", 500, -90, 90, 500, -90, 90 );
     Utils::TreeToHisto( tree, hName, var, TCut(), kFALSE );
@@ -57,7 +57,7 @@ void Radiograph()
 
   // variable names
   {
-    const TString var( "_r:_z" );
+    const TString var( "_clusters._truth_r:_clusters._truth_z" );
     const TString hName = "radiograph2";
     auto h2d = new TH2F( hName, "", 500, -110, 110, 500, 0, 90 );
     Utils::TreeToHisto( tree, hName, var, TCut(), kFALSE );

@@ -11,18 +11,18 @@ Double_t Function( Double_t* x, Double_t* par)
     ;
 }
 
-//___________________________________________________________
-Double_t Function( Double_t* x, Double_t* par )
-{
-
-  Double_t alpha1 = (x[0]-par[1])/par[2];
-  Double_t alpha2 = -(x[0]-par[4])/par[5];
-  return
-    par[0]*(TMath::Erf( alpha1/TMath::Sqrt( 2 ) )+1)/2 +
-    par[3]*(TMath::Erf( alpha2/TMath::Sqrt( 2 ) )+1)/2;
-
-}
-
+// //___________________________________________________________
+// Double_t Function( Double_t* x, Double_t* par )
+// {
+// 
+//   Double_t alpha1 = (x[0]-par[1])/par[2];
+//   Double_t alpha2 = -(x[0]-par[4])/par[5];
+//   return
+//     par[0]*(TMath::Erf( alpha1/TMath::Sqrt( 2 ) )+1)/2 +
+//     par[3]*(TMath::Erf( alpha2/TMath::Sqrt( 2 ) )+1)/2;
+// 
+// }
+// 
 void DrawErf( void )
 {
   // TF1* f = new TF1( "Function", Function, -5, 5, 5 );

@@ -21,8 +21,8 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 //____________________________________________________________________________
 Float_t DeltaPhi( Float_t phi )
 {
-  if( phi >= 2*M_PI ) return phi - 2*M_PI;
-  else if( phi <= -2*M_PI ) return phi + 2*M_PI;
+  if( phi >= M_PI ) return phi - 2*M_PI;
+  else if( phi < -M_PI ) return phi + 2*M_PI;
   else return phi;
 }
 
@@ -35,13 +35,13 @@ TString DeltaRPhiMomentum_truth( TString tag = TString() )
   gStyle->SetOptStat(0);
   gStyle->SetOptFit(0);
 
-  const int layer = 7;
+  const int layer = 54;
 
   // initial guess for max residual
   Float_t max_residual = 1.5;
 
-  if( tag.IsNull() ) tag = "_low_momentum_truth_notpc_noouter" ;
-  const TString inputFile = Form( "DST/CONDOR%s/dst_eval%s*.root", tag.Data(), tag.Data() );
+  if( tag.IsNull() ) tag = "_flat_full_notpc_nominal" ;
+  const TString inputFile = Form( "DST/CONDOR%s/dst%s*.root", tag.Data(), tag.Data() );
   const TString pdfFile = Form( "Figures/DeltaRPhiMomentum_truth%s_%i.pdf", tag.Data(), layer );
 
   std::cout << "DeltaRPhi_truth - inputFile: " << inputFile << std::endl;
@@ -60,6 +60,10 @@ TString DeltaRPhiMomentum_truth( TString tag = TString() )
   const TCut layer_cut( Form( "_clusters._layer == %i", layer ) );
 
   // create TGraph to store resolution vs layer
+  auto tg_mean = new TGraphErrors();
+  tg_mean->SetName( "mean" );
+
+  // create TGraph to store resolution vs layer
   auto tg = new TGraphErrors();
   tg->SetName( "residuals" );
 
@@ -69,7 +73,7 @@ TString DeltaRPhiMomentum_truth( TString tag = TString() )
   // momentum range
   const double ptmin = 0.5;
   const double ptmax = 5;
-  constexpr int nptbins = 40;
+  constexpr int nptbins = 10;
 
   // optimize max esidual
   for( int i=0; i<3; ++i )
@@ -77,7 +81,7 @@ TString DeltaRPhiMomentum_truth( TString tag = TString() )
     const TString hname( "h" );
     std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_residual, max_residual ) );
     Utils::TreeToHisto( tree, hname, var, layer_cut, false );
-    max_residual = 5*h1->GetRMS();
+    max_residual = 3*h1->GetRMS();
   }
 
   auto h2d( new TH2F( hname, "", nptbins, ptmin, ptmax, 100, -max_residual, max_residual ) );
@@ -100,16 +104,22 @@ TString DeltaRPhiMomentum_truth( TString tag = TString() )
 
     // auto result = Fit( h );
     const auto result = std::min( Fit( h ), Fit_box( h ) );
-    std::cout << "valid: " << result.valid() << std::endl;
     auto f = result._function;
     f->Draw( "same" );
 
     {
       auto h = f->GetHistogram();
+      auto mean = f->GetParameter(1)*1e4;
+      auto meanError = f->GetParError(1)*1e4;
       auto sigma = h->GetRMS()*1e4;
       auto sigmaError = f->GetParError(2)*1e4;
 
-      Draw::PutText( 0.2, 0.8, Form( "#sigma = %.3g #pm %.3g #mum", sigma, sigmaError ) );
+      Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean, meanError ) );
+      Draw::PutText( 0.2, 0.6, Form( "#sigma = %.3g #pm %.3g #mum", sigma, sigmaError ) );
+
+      tg_mean->SetPoint( ibin, h2d->GetXaxis()->GetBinCenter( ibin+1 ), mean );
+      tg_mean->SetPointError( ibin, 0, meanError );
+
       tg->SetPoint( ibin, h2d->GetXaxis()->GetBinCenter( ibin+1 ), sigma );
       tg->SetPointError( ibin, 0, sigmaError );
     }
@@ -118,24 +128,43 @@ TString DeltaRPhiMomentum_truth( TString tag = TString() )
 
   pdfDocument.Add( cv );
 
-  // TGraph
-  cv = new TCanvas( "cvtg", "cvtg", 800, 800 );
-  cv->SetLeftMargin( 0.17 );
+  // mean
+  {
+    cv = new TCanvas( "cvtg", "cvtg", 800, 800 );
+    cv->SetLeftMargin( 0.17 );
 
-  auto h = new TH1F( "dummy", "", 100, ptmin, ptmax );
-  h->SetMinimum(0);
-  h->SetMaximum(max_residual*1e4/2);
-  h->GetXaxis()->SetTitle( "#it{p}_{T} (GeV/#it{c})" );
-  h->GetYaxis()->SetTitle( "#sigma_{r.#Delta#phi} (track-truth) (#mum)" );
-  h->GetYaxis()->SetTitleOffset( 1.7 );
-  h->Draw();
+    tg_mean->SetMarkerStyle(20);
+    tg_mean->SetLineColor(1);
+    tg_mean->SetMarkerColor(1);
+    tg_mean->Draw("AP");
 
-  tg->SetMarkerStyle(20);
-  tg->SetLineColor(1);
-  tg->SetMarkerColor(1);
-  tg->Draw("P");
+    tg_mean->GetXaxis()->SetTitle( "#it{p}_{T} (GeV/#it{c})" );
+    tg_mean->GetYaxis()->SetTitle( "<r.#Delta#phi> (track-truth) (#mum)" );
+    tg_mean->GetYaxis()->SetTitleOffset( 1.7 );
+    pdfDocument.Add( cv );
+  }
 
-  pdfDocument.Add( cv );
+  // sigma
+  {
+    cv = new TCanvas( "cvtg", "cvtg", 800, 800 );
+    cv->SetLeftMargin( 0.17 );
+
+    auto h = new TH1F( "dummy", "", 100, ptmin, ptmax );
+    h->SetMinimum(0);
+    h->SetMaximum(max_residual*1e4/2);
+    h->GetXaxis()->SetTitle( "#it{p}_{T} (GeV/#it{c})" );
+    h->GetYaxis()->SetTitle( "#sigma_{r.#Delta#phi} (track-truth) (#mum)" );
+    h->GetYaxis()->SetTitleOffset( 1.7 );
+    h->Draw();
+
+    tg->SetMarkerStyle(20);
+    tg->SetLineColor(1);
+    tg->SetMarkerColor(1);
+    tg->Draw("P");
+
+    pdfDocument.Add( cv );
+  }
+
   return pdfFile;
 
 }

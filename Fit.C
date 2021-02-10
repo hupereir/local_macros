@@ -44,6 +44,10 @@ inline bool operator < (const Result& lhs, const Result& rhs )
 
 }
 
+template<class T>
+bool IsSuccess( T fitResult )
+{ return fitResult.Get() && fitResult->Status() == 0 && fitResult->CovMatrixStatus() == 3; }
+
 //_______________________________________
 Result Fit( TH1* h )
 {
@@ -59,7 +63,7 @@ Result Fit( TH1* h )
   auto f = new TF1( fname, FitFunction, xMin, xMax, 3 );
   f->SetNpx(500);
   f->SetParameter(0, h->GetMaximum() );
-  f->SetParameter(1, 0 );
+  f->SetParameter(1, h->GetMean() );
   f->SetParameter(2, h->GetRMS()/2 );
 
   f->SetLineColor(2);
@@ -67,7 +71,40 @@ Result Fit( TH1* h )
 
   const auto fitResult = h->Fit( f, "0QS" );
 
-  return { f, fitResult->Status() == 0 && fitResult->CovMatrixStatus() == 3, f->GetChisquare()/f->GetNDF() };
+  return { f, IsSuccess( fitResult ), f->GetChisquare()/f->GetNDF() };
+
+}
+
+//_______________________________________
+Result Fit_double( TH1* h )
+{
+  if( !h->GetEntries() ) return {};
+
+  const auto fname = Form( "%s_fit", h->GetName() );
+  const auto xMin = h->GetXaxis()->GetXmin();
+  const auto xMax = h->GetXaxis()->GetXmax();
+
+  auto FitFunction = []( Double_t* x, Double_t* par )
+  { 
+    return 
+      par[0]*std::exp( -0.5*square( (*x-par[1])/par[2] ) ) +
+      par[3]*std::exp( -0.5*square( (*x-par[1])/par[4] ) );
+  };
+
+  auto f = new TF1( fname, FitFunction, xMin, xMax, 5 );
+  f->SetNpx(500);
+  f->SetParameter(0, h->GetMaximum() );
+  f->SetParameter(1, h->GetMean() );
+  f->SetParameter(2, h->GetRMS()/2 );
+  f->SetParameter(3, h->GetMaximum()/10 );
+  f->SetParameter(4, h->GetRMS()*2 );
+
+  f->SetLineColor(2);
+  f->SetLineWidth(2);
+
+  const auto fitResult = h->Fit( f, "0S" );
+
+  return { f, IsSuccess( fitResult ), f->GetChisquare()/f->GetNDF() };
 
 }
 
@@ -91,9 +128,9 @@ Result Fit_box( TH1* h )
   auto f = new TF1( fname, FitFunction, xMin, xMax, 4 );
   f->SetNpx(500);
   f->SetParameter(0, h->GetMaximum() );
-  f->SetParameter(1, 0 );
-  f->SetParameter(2, h->GetRMS()/2.5 );
-  f->SetParameter(3, 0.1 );
+  f->SetParameter(1, h->GetMean() );
+  f->SetParameter(2, h->GetRMS() );
+  f->SetParameter(3, 0.5 );
 
   f->SetLineColor(2);
   f->SetLineWidth(2);
@@ -108,7 +145,7 @@ Result Fit_box( TH1* h )
   }
 
   /* we add a 1.5 factor to the chisquare to slightly favor gaussian fit over box fit */
-  return { f, fitResult->Status() == 0 && fitResult->CovMatrixStatus() == 3, 1.5*f->GetChisquare()/f->GetNDF() };
+  return { f, IsSuccess( fitResult ), 1.5*f->GetChisquare()/f->GetNDF() };
 
 }
 #endif
