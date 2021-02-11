@@ -74,16 +74,24 @@ T delta_phi( const T& phi )
 //__________________________________________________________________
 bool accept_track( const TrackingEvaluator_hp::TrackStruct& track )
 {
-  
+
   // momentum cut
-  // if( track._truth_pt < 0.5 ) return false;
-  if( track._pt < 0.5 ) return false;
-  
+  if( use_truth_information )
+  {
+
+    if( track._truth_pt < 0.5 ) return false;
+
+  } else {
+
+    if( track._pt < 0.5 ) return false;
+
+  }
+
   // hit pattern cuts
   if( track._nclusters_mvtx < 3 ) return false;
   if( track._nclusters_intt < 2 ) return false;
   if( use_micromegas && track._nclusters_micromegas < 2 ) return false;
-  
+
   // also cut on the ndf
   if( use_micromegas && track._ndf < 9 ) return false;
 
@@ -97,7 +105,7 @@ bool accept_cluster( const TrackingEvaluator_hp::ClusterStruct& cluster )
   // skip clusters not in TPC
   if( cluster._layer < firstLayer_tpc || cluster._layer >= firstLayer_tpc + nLayers_tpc )
   { return false; }
-  
+
   if( true )
   {
     /*
@@ -118,7 +126,7 @@ bool accept_cluster( const TrackingEvaluator_hp::ClusterStruct& cluster )
     if( std::abs( cluster._trk_beta ) > max_beta ) return false;
   }
 
-  return true;    
+  return true;
 }
 
 //_________________________________________________________________________
@@ -229,7 +237,7 @@ TString Distortions()
   const TString tag = "_realistic_micromegas";
   const TString inputFile = "DST/CONDOR_realistic_micromegas/dst_reco_truth_notpc_distortions-coarse/dst_reco_realistic_micromegas_*.root";
   const TString subtag = "-coarse-new4";
-  
+
 //   const TString inputFile = "DST/CONDOR_realistic_micromegas/dst_reco_truth_notpc_distortions/dst_reco_realistic_micromegas_*.root";
 //   const TString subtag = "-new";
 
@@ -261,10 +269,10 @@ TString Distortions()
   // counters
   int total_tracks = 0;
   int accepted_tracks = 0;
-  
+
   int total_clusters = 0;
   int accepted_clusters = 0;
-  
+
   // loop over entries
   // const int entries = 500000;
   const int entries = tree->GetEntries();
@@ -285,28 +293,28 @@ TString Distortions()
       // check
       if( !accept_track( track ) ) continue;
       ++accepted_tracks;
-      
+
       // loop over clusters
       for( const auto& cluster:track._clusters )
       {
-        
+
         ++total_clusters;
         if( !accept_cluster( cluster ) ) continue;
 
         // store errors
-        #if false 
+        #if false
         const auto erp = square(cluster._trk_r*cluster._phi_error);
         const auto ez = square(cluster._z_error);
         #else
-        const auto erp = use_truth_information ? 
+        const auto erp = use_truth_information ?
           square(cluster._trk_r*cluster._phi_error):
           ( square(cluster._trk_r)*( square( cluster._phi_error ) + square( cluster._trk_phi_error ) ) );
 
-        const auto ez = use_truth_information ? 
+        const auto ez = use_truth_information ?
           square(cluster._z_error):
           ( square( cluster._z_error ) + square( cluster._trk_z_error ) );
         #endif
-        
+
         // sanity check
         if( std::isnan( erp ) ) continue;
         if( std::isnan( ez ) ) continue;
@@ -315,7 +323,7 @@ TString Distortions()
           cluster._truth_r*( delta_phi( cluster._phi - cluster._truth_phi ) ):
           cluster._trk_r*( delta_phi( cluster._phi - cluster._trk_phi ) );
         if( std::isnan(drp) ) continue;
-        
+
         const auto talpha = use_truth_information ?
           -std::tan( cluster._truth_alpha ):
           -std::tan( cluster._trk_alpha );
@@ -444,6 +452,6 @@ TString Distortions()
   std::cout << "Distortions - entries: " << entries << std::endl;
   std::cout << "Distortions - track statistics total: " << total_tracks << " accepted: " << accepted_tracks << " fraction: " << 100.*accepted_tracks/total_tracks << "%" << std::endl;
   std::cout << "Distortions - cluster statistics total: " << total_clusters << " accepted: " << accepted_clusters << " fraction: " << 100.*accepted_clusters/total_clusters << "%" << std::endl;
-  
+
   return rootfilename;
 }
