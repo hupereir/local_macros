@@ -15,16 +15,22 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 #include "Fit.C"
 
 //____________________________________________________________________________
-TString DeltaZ_cluster( TString tag = TString() )
+TString DeltaZ_cluster()
 {
 
   set_style( false );
 
   // initial guess for max residuals
-  std::array<float, nDetectors> max_det_residual = { 0.003, 5, 1.2, 1.2, 1.2, 0.1, 0.1};
+  // std::array<float, nDetectors> max_det_residual = { 0.003, 5, 1.2, 1.2, 1.2, 0.1, 0.1};
+  // std::array<float, nDetectors> max_det_residual = { 0.003, 5, 0.5, 0.5, 0.5, 0.1, 0.1};
+  std::array<float, nDetectors> max_det_residual = { 0.003, 5, 2, 2, 2, 0.1, 0.1};
 
-  if( tag.IsNull() ) tag = "_truth_notpc";
-  const TString inputFile = Form( "DST/CONDOR_realistic_micromegas/dst_reco%s/dst_reco_realistic_micromegas_1?.root", tag.Data() );
+  // input files
+  const TString tag = "_flat_acts_truth_notpc_nodistortion_smeared3";
+  const TString inputFile = Form( "DST/CONDOR%s/dst_reco%s*.root", tag.Data(), tag.Data() );
+
+//   const TString tag = "_acts_truth_nodistortion";
+//   const TString inputFile = Form( "DST/dst_eval%s*.root", tag.Data() );
 
   const TString pdfFile = Form( "Figures/DeltaZ_cluster%s.pdf", tag.Data() );
   const TString rootFile  = Form( "Rootfiles/DeltaZ_cluster%s.root", tag.Data() );
@@ -47,14 +53,12 @@ TString DeltaZ_cluster( TString tag = TString() )
   #ifdef USE_TRACKS
   const TString var( "_tracks._clusters._z - _tracks._clusters._truth_z" );
   const TString var2d = Form( "%s:_tracks._clusters._layer", var.Data() );
-  // const TCut cluster_cut( "_clusters._size == 1" );
-  const TCut cluster_cut( "_tracks._clusters._z > 0" );
   #else
   const TString var( "_clusters._z - _clusters._truth_z" );
   const TString var2d = Form( "%s:_clusters._layer", var.Data() );
-  // const TCut cluster_cut( "_clusters._size == 1" );
-  const TCut cluster_cut( "_clusters._z > 0" );
   #endif
+
+  const TCut cluster_cut;
   const TCut momentum_cut;
 
   // create TGraph to store resolution vs layer
@@ -65,7 +69,6 @@ TString DeltaZ_cluster( TString tag = TString() )
   auto tgl = new TGraphErrors();
   tgl->SetName( "residuals_layers" );
 
-
   // create TGraph to store resolution vs layer
   auto tgm = new TGraphErrors();
   tg->SetName( "residuals mean" );
@@ -74,29 +77,33 @@ TString DeltaZ_cluster( TString tag = TString() )
   auto tgml = new TGraphErrors();
   tgml->SetName( "residuals_layers mean" );
 
-  
+  Utils::max_entries = 1e4;
+
   // optimize max residual
-  for( int idet = 0; idet < nDetectors; ++idet )
+  if( true )
   {
-
-    // skip detector 5, which is phi segmented micromegas
-    if( idet == 5 ) continue;
-
-    const TString hname( Form( "deltarphi_%i_0", idet ) );
-
-    #ifdef USE_TRACKS
-    const TCut layer_cut( Form( "_tracks._clusters._layer==%i", firstLayer[idet] ) );
-    #else
-    const TCut layer_cut( Form( "_clusters._layer==%i", firstLayer[idet] ) );
-    #endif
-
-    for( int i=0; i<3; ++i )
+    for( int idet = 0; idet < nDetectors; ++idet )
     {
-      std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_det_residual[idet], max_det_residual[idet] ) );
-      Utils::TreeToHisto( tree, hname, var, momentum_cut&&layer_cut, false );
-      max_det_residual[idet] = 5*h1->GetRMS() + std::abs(h1->GetMean() );
-    }
 
+      // skip detector 5, which is phi segmented micromegas
+      if( idet == 5 ) continue;
+
+      const TString hname( Form( "deltarphi_%i_0", idet ) );
+
+      #ifdef USE_TRACKS
+      const TCut layer_cut( Form( "_tracks._clusters._layer==%i", firstLayer[idet] ) );
+      #else
+      const TCut layer_cut( Form( "_clusters._layer==%i", firstLayer[idet] ) );
+      #endif
+
+      for( int i=0; i<3; ++i )
+      {
+        std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_det_residual[idet], max_det_residual[idet] ) );
+        Utils::TreeToHisto( tree, hname, var, momentum_cut&&layer_cut, false );
+        max_det_residual[idet] = 5*h1->GetRMS() + std::abs(h1->GetMean() );
+      }
+
+    }
   }
 
   // save all histograms
@@ -107,13 +114,20 @@ TString DeltaZ_cluster( TString tag = TString() )
   {
 
     std::cout << "DeltaZ_cluster - detector " << idet << " max_det_residual: " << max_det_residual[idet] << std::endl;
-    
+
     // skip detector 5, which is phi segmented micromegas
     if( idet == 5 ) continue;
 
+    // layer cut
+    #ifdef USE_TRACKS
+    const TCut layer_cut = Form( "_tracks._clusters._layer >= %i && _tracks._clusters._layer < %i", firstLayer[idet], firstLayer[idet] + nLayers[idet] );
+    #else
+    const TCut layer_cut = Form( "_clusters._layer >= %i && _clusters._layer < %i", firstLayer[idet], firstLayer[idet] + nLayers[idet] );
+    #endif
+
     const TString hname( Form( "deltaz_%i", idet ) );
     std::unique_ptr<TH2> h2d( new TH2F( hname, "", nLayers[idet], firstLayer[idet], firstLayer[idet] + nLayers[idet], 100, -max_det_residual[idet], max_det_residual[idet] ) );
-    Utils::TreeToHisto( tree, hname, var2d, cluster_cut&&momentum_cut, false );
+    Utils::TreeToHisto( tree, hname, var2d, cluster_cut&&momentum_cut&&layer_cut, false );
 
     // create canvas
     const TString cvName = Form( "cv_%i", idet );
@@ -146,66 +160,68 @@ TString DeltaZ_cluster( TString tag = TString() )
       // fit
       const auto entries( h->GetEntries() );
       std::cout << "DeltaRPhi_cluster - layer: " << layerIndex << " entries: " << entries << std::endl;
-      if( entries )
+      if( !entries ) continue;
+      if( do_fit )
       {
-        if( do_fit )
+
+        const auto result = idet == 6 ?
+          Fit_double(h.get()):
+          std::min( Fit(h.get()), Fit_box(h.get()) );
+//         const auto result =
+//           std::min( Fit(h.get()), Fit_box(h.get()) );
+
+        //           const auto result = std::min( Fit(h.get()), Fit_box(h.get()) );
+
+        if( result._valid )
         {
+          auto f = result._function;
+          f->Draw("same");
+          auto h = f->GetHistogram();
 
-          const auto result = idet == 6 ?
-            Fit_double(h.get()):
-            std::min( Fit(h.get()), Fit_box(h.get()) );
-
-//           const auto result = std::min( Fit(h.get()), Fit_box(h.get()) );
-
-          if( result._valid )
-          {
-            auto f = result._function;
-            f->Draw("same");
-            auto h = f->GetHistogram();
-
-            auto mean = f->GetParameter(1);
-            auto meanError = f->GetParError(1);
-            Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
-
-            tgml->SetPoint( layerIndex, layerIndex, mean );
-            tgml->SetPointError( layerIndex, 0, meanError );
-
-            tgm->SetPoint( layerIndex, radius[layerIndex], mean );
-            tgm->SetPointError( layerIndex, 0, meanError );
-
-            auto rms = h->GetRMS();
-            auto error = f->GetParError(2);
-            Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
-
-            tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
-            tgl->SetPointError( layerIndex, 0, error*1e4 );
-
-            tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
-            tg->SetPointError( layerIndex, 0, error*1e4 );
-          } else {
-            std::cout << "DeltaZ - skipping layer " << layerIndex << " (failed fit)" << std::endl;
-          }
-        } else {
-          auto mean = h->GetMean();
-          auto meanError = h->GetMeanError();
+          auto mean = f->GetParameter(1);
+          auto meanError = f->GetParError(1);
           Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
 
           tgml->SetPoint( layerIndex, layerIndex, mean );
           tgml->SetPointError( layerIndex, 0, meanError );
-          
+
           tgm->SetPoint( layerIndex, radius[layerIndex], mean );
           tgm->SetPointError( layerIndex, 0, meanError );
 
           auto rms = h->GetRMS();
-          auto error = h->GetRMSError();
+          auto error = f->GetParError(2);
           Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+
+          Draw::PutText( 0.2, 0.6, Form( "entries = %.0f", entries ) );
 
           tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
           tgl->SetPointError( layerIndex, 0, error*1e4 );
 
           tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
           tg->SetPointError( layerIndex, 0, error*1e4 );
+        } else {
+          std::cout << "DeltaZ - skipping layer " << layerIndex << " (failed fit)" << std::endl;
         }
+      } else {
+        auto mean = h->GetMean();
+        auto meanError = h->GetMeanError();
+        Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+
+        tgml->SetPoint( layerIndex, layerIndex, mean );
+        tgml->SetPointError( layerIndex, 0, meanError );
+
+        tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+        tgm->SetPointError( layerIndex, 0, meanError );
+
+        auto rms = h->GetRMS();
+        auto error = h->GetRMSError();
+        Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+
+        tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
+        tgl->SetPointError( layerIndex, 0, error*1e4 );
+
+        tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
+        tg->SetPointError( layerIndex, 0, error*1e4 );
       }
 
       // draw vertical line at zero
@@ -222,7 +238,7 @@ TString DeltaZ_cluster( TString tag = TString() )
 
   }
 
-  // RMS tgraph
+  // RMS vs layer
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
@@ -230,6 +246,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
     h->SetMinimum(0);
     h->SetMaximum(1.2*Utils::GetMaximum(tgl));
+    h->SetMaximum(900);
     h->GetXaxis()->SetTitle( "layer id" );
     h->GetYaxis()->SetTitle( "#sigma_{z} (cluster-truth) (#mum)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
@@ -243,7 +260,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
-  // RMS tgraph
+  // RMS vs radius
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
@@ -251,6 +268,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
     h->SetMinimum(0);
     h->SetMaximum(1.2*Utils::GetMaximum(tg));
+    h->SetMaximum(900);
     h->GetXaxis()->SetTitle( "r (cm)" );
     h->GetYaxis()->SetTitle( "#sigma_{z} (cluster-truth) (#mum)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
@@ -264,7 +282,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
-  // mean tgraph
+  // mean vs layer
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
@@ -273,7 +291,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     h->SetMinimum(-0.04);
     h->SetMaximum(0.04);
     h->GetXaxis()->SetTitle( "layer id" );
-    h->GetYaxis()->SetTitle( "#LT#Deltaz#GT (cluster-truth) (#mum)" );
+    h->GetYaxis()->SetTitle( "#LT#Deltaz#GT (cluster-truth) (cm)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
     h->Draw();
 
@@ -285,7 +303,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
-  // Mean tgraph
+  // Mean vs radius
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
@@ -294,7 +312,7 @@ TString DeltaZ_cluster( TString tag = TString() )
     h->SetMinimum(-0.04);
     h->SetMaximum(0.04);
     h->GetXaxis()->SetTitle( "r (cm)" );
-    h->GetYaxis()->SetTitle( "#LT#Deltaz#GT (cluster-truth) (#mum)" );
+    h->GetYaxis()->SetTitle( "#LT#Deltaz#GT (cluster-truth) (cm)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
     h->Draw();
 
@@ -305,6 +323,7 @@ TString DeltaZ_cluster( TString tag = TString() )
 
     pdfDocument.Add( cv.get() );
   }
+
   // save everything in rootfiles
   std::unique_ptr<TFile> output( TFile::Open( rootFile, "RECREATE" ) );
   output->cd();
@@ -312,6 +331,6 @@ TString DeltaZ_cluster( TString tag = TString() )
   tgl->Write();
   tg->Write();
   output->Close();
-  return pdfFile;
 
+  return pdfFile;
 }

@@ -49,6 +49,10 @@ bool IsSuccess( T fitResult )
 { return fitResult.Get() && fitResult->Status() == 0 && fitResult->CovMatrixStatus() == 3; }
 
 //_______________________________________
+Double_t FitFunction( Double_t* x, Double_t* par )
+{ return par[0]*std::exp( -0.5*square( (*x-par[1])/par[2] ) ); }
+
+//_______________________________________
 Result Fit( TH1* h )
 {
   if( !h->GetEntries() ) return {};
@@ -57,8 +61,8 @@ Result Fit( TH1* h )
   const auto xMin = h->GetXaxis()->GetXmin();
   const auto xMax = h->GetXaxis()->GetXmax();
 
-  auto FitFunction = []( Double_t* x, Double_t* par )
-  { return par[0]*std::exp( -0.5*square( (*x-par[1])/par[2] ) ); };
+//   auto FitFunction = []( Double_t* x, Double_t* par )
+//   { return par[0]*std::exp( -0.5*square( (*x-par[1])/par[2] ) ); };
 
   auto f = new TF1( fname, FitFunction, xMin, xMax, 3 );
   f->SetNpx(500);
@@ -76,6 +80,14 @@ Result Fit( TH1* h )
 }
 
 //_______________________________________
+Double_t FitFunction2( Double_t* x, Double_t* par )
+{ 
+  return 
+    par[0]*std::exp( -0.5*square( (*x-par[1])/par[2] ) ) +
+    par[3]*std::exp( -0.5*square( (*x-par[1])/par[4] ) );
+}
+
+//_______________________________________
 Result Fit_double( TH1* h )
 {
   if( !h->GetEntries() ) return {};
@@ -84,14 +96,7 @@ Result Fit_double( TH1* h )
   const auto xMin = h->GetXaxis()->GetXmin();
   const auto xMax = h->GetXaxis()->GetXmax();
 
-  auto FitFunction = []( Double_t* x, Double_t* par )
-  { 
-    return 
-      par[0]*std::exp( -0.5*square( (*x-par[1])/par[2] ) ) +
-      par[3]*std::exp( -0.5*square( (*x-par[1])/par[4] ) );
-  };
-
-  auto f = new TF1( fname, FitFunction, xMin, xMax, 5 );
+  auto f = new TF1( fname, FitFunction2, xMin, xMax, 5 );
   f->SetNpx(500);
   f->SetParameter(0, h->GetMaximum() );
   f->SetParameter(1, h->GetMean() );
@@ -109,6 +114,14 @@ Result Fit_double( TH1* h )
 }
 
 //_______________________________________
+Double_t FitFunction3( Double_t* x, Double_t* par )
+{
+  const Double_t t0 = (x[0]-par[1]+par[2]*std::sqrt(12)/2)/par[3];
+  const Double_t t1 = (x[0]-par[1]-par[2]*std::sqrt(12)/2)/par[3];
+  return par[0]*( std::erf(t0) + std::erf(-t1) );
+}
+
+//_______________________________________
 Result Fit_box( TH1* h )
 {
 
@@ -118,14 +131,7 @@ Result Fit_box( TH1* h )
   const auto xMin = h->GetXaxis()->GetXmin();
   const auto xMax = h->GetXaxis()->GetXmax();
 
-  auto FitFunction = []( Double_t* x, Double_t* par )
-  {
-    const Double_t t0 = (x[0]-par[1]+par[2]*std::sqrt(12)/2)/par[3];
-    const Double_t t1 = (x[0]-par[1]-par[2]*std::sqrt(12)/2)/par[3];
-    return par[0]*( std::erf(t0) + std::erf(-t1) );
-  };
-
-  auto f = new TF1( fname, FitFunction, xMin, xMax, 4 );
+  auto f = new TF1( fname, FitFunction3, xMin, xMax, 4 );
   f->SetNpx(500);
   f->SetParameter(0, h->GetMaximum() );
   f->SetParameter(1, h->GetMean() );

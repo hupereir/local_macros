@@ -24,16 +24,23 @@ float delta_phi( float phi )
 }
 
 //____________________________________________________________________________
-TString DeltaRPhi( TString tag = TString() )
+TString DeltaRPhi()
 {
 
   set_style( false );
 
-  // initial guess for max residuals
-  std::array<float, nDetectors> max_det_residual = { 0.01, 0.01, 2, 2, 2, 0.1, 0.1};
+//   gStyle->SetOptStats(0);
 
-  if( tag.IsNull() ) tag = "_realistic_micromegas_fullmap" ;
-  const TString inputFile = "DST/CONDOR_realistic_micromegas/dst_reco_truth_notpc_distortions_fullmap/dst_reco_*.root";
+  // initial guess for max residuals
+  std::array<float, nDetectors> max_det_residual = { 0.01, 0.01, 4, 4, 4, 0.2, 0.2};
+//   std::array<float, nDetectors> max_det_residual = { 0.01, 0.01, 0.1, 0.1, 0.1, 0.1, 0.1};
+//   // std::array<float, nDetectors> max_det_residual = { 0.01, 0.01, 0.05, 0.05, 0.05, 0.1, 0.1};
+//   // std::array<float, nDetectors> max_det_residual = { 0.01, 0.01, 2,2,2, 0.1, 0.1};
+
+  // input files
+  // const TString tag = "_TrackReconstruction-old";
+  const TString tag = "_TrackReconstruction-new2";
+  const TString inputFile = Form( "DST/CONDOR%s/TRACKS-00053877-000?-full.root", tag.Data() );
 
   const TString pdfFile = Form( "Figures/DeltaRPhi%s.pdf", tag.Data() );
   const TString rootFile  = Form( "Rootfiles/DeltaRPhi%s.root", tag.Data() );
@@ -44,46 +51,67 @@ TString DeltaRPhi( TString tag = TString() )
   PdfDocument pdfDocument( pdfFile );
 
   // configuration
-  const bool do_fit = true;
+  const bool do_fit = false;
 
   // file manager
   FileManager fileManager( inputFile );
   auto tree = fileManager.GetChain( "T" );
+  if( !tree ) {
+    std::cout << "DeltaRPhi - invalid tree" << std::endl;
+    return pdfFile;
+  }
 
   // variable names
-  const TString var( "_tracks._clusters._trk_r*delta_phi(_tracks._clusters._trk_phi - _tracks._clusters._phi)" );
-  const TString var2d = Form( "%s:_tracks._clusters._layer", var.Data() );
+  const TString var( "_tracks._clusters[]._trk_r*delta_phi(_tracks._clusters[]._phi - _tracks._clusters[]._trk_phi)" );
+  const TString var2d = Form( "%s:_tracks._clusters[]._layer", var.Data() );
+
   const TCut momentum_cut = ("_tracks._pt>0.5" );
   const TCut pattern_cut(
-    "_tracks._truth_pt>0.5"
-    "&&_tracks._nclusters_mvtx>0"
+    "1"
+    "&&_tracks._nclusters_mvtx>2"
     "&&_tracks._nclusters_intt>=2"
-    "&&_tracks._nclusters_micromegas==2");
+    "&&_tracks._nclusters_micromegas>=2"
+    "&&_tracks._clusters[]._trk_r>0"
+    );
+
+  const TCut zcut("fabs(_tracks._clusters[]._trk_z) < 25");
+
+  Utils::max_entries = 100000;
 
   // create TGraph to store resolution vs layer
   auto tg = new TGraphErrors();
-  tg->SetName( "residuals" );
+  tg->SetName("residuals");
 
   // create TGraph to store resolution vs layer
   auto tgl = new TGraphErrors();
   tgl->SetName( "residuals_layers" );
 
+  // create TGraph to store mean vs layer
+  auto tgm = new TGraphErrors();
+  tgm->SetName( "residuals mean" );
+
+  // create TGraph to store mean vs radius
+  auto tgml = new TGraphErrors();
+  tgml->SetName( "residuals_layers mean" );
+
   // optimize max residual
-  for( int idet = 0; idet < nDetectors; ++idet )
+  if( false )
   {
-    // skip detector 6, which is z segmented micromegas
-    if( idet == 6 ) continue;
-
-    const TString hname( Form( "deltarphi_%i_0", idet ) );
-    const TCut layer_cut( Form( "_tracks._clusters[]._layer==%i", firstLayer[idet] ) );
-
-    for( int i=0; i<3; ++i )
+    for( int idet = 0; idet < nDetectors; ++idet )
     {
-      std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_det_residual[idet], max_det_residual[idet] ) );
-      Utils::TreeToHisto( tree, hname, var, momentum_cut&&layer_cut&&pattern_cut, false );
-      max_det_residual[idet] = 5*h1->GetRMS() + std::abs( h1->GetMean() );;
-    }
+      // skip detector 6, which is z segmented micromegas
+      if( idet == 6 ) continue;
 
+      const TString hname( Form( "deltarphi_%i_0", idet ) );
+      const TCut layer_cut( Form( "_tracks._clusters[]._layer==%i", firstLayer[idet] ) );
+
+      for( int i=0; i<3; ++i )
+      {
+        std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_det_residual[idet], max_det_residual[idet] ) );
+        Utils::TreeToHisto( tree, hname, var, momentum_cut&&layer_cut&&pattern_cut&&zcut, false );
+        max_det_residual[idet] = 10*h1->GetRMS() + std::abs( h1->GetMean() );;
+      }
+    }
   }
 
   // save all histograms
@@ -96,11 +124,11 @@ TString DeltaRPhi( TString tag = TString() )
     // skip detector 6, which is z segmented micromegas
     if( idet == 6 ) continue;
 
-    const TCut detector_cut( Form( "_tracks._clusters[]._layer>=%i &&_tracks._clusters[]._layer<%i ", firstLayer[idet], firstLayer[idet] + nLayers[idet] ) );
+    const TCut layer_cut( Form( "_tracks._clusters[]._layer>=%i &&_tracks._clusters[]._layer<%i ", firstLayer[idet], firstLayer[idet] + nLayers[idet] ) );
 
     const TString hname( Form( "deltarphi_%i", idet ) );
     std::unique_ptr<TH2> h2d( new TH2F( hname, "", nLayers[idet], firstLayer[idet], firstLayer[idet] + nLayers[idet], 100, -max_det_residual[idet], max_det_residual[idet] ) );
-    Utils::TreeToHisto( tree, hname, var2d, momentum_cut&&pattern_cut&&detector_cut, false );
+    Utils::TreeToHisto( tree, hname, var2d, momentum_cut&&pattern_cut&&layer_cut&&zcut, false );
 
     // create canvas
     const TString cvName = Form( "cv_%i", idet );
@@ -115,62 +143,77 @@ TString DeltaRPhi( TString tag = TString() )
       const auto hname = Form( "h_%i", layerIndex );
       std::unique_ptr<TH1> h( h2d->ProjectionY( hname, ilayer+1, ilayer+1 ) );
       h->SetTitle( hname );
+
+      const auto entries( h->GetEntries() );
+      std::cout << "DeltaRPhi - layer: " << layerIndex << " entries: " << entries << std::endl;
+      if( !entries ) continue;
+
       h->SetLineColor( 1 );
-      h->SetMarkerColor( 1 );
-      h->GetXaxis()->SetTitle( "r.#Delta#phi_{track-cluster} (cm)" );
+      h->SetFillStyle(1001);
+      h->SetFillColor(kYellow );
+      h->GetXaxis()->SetTitle( "r_{trk}.#Delta#phi_{clus-trk} [cm]" );
       h->GetXaxis()->SetRangeUser( -max_det_residual[idet], max_det_residual[idet] );
 
       cv->cd( ilayer+1 );
       h->SetMaximum( 1.2*h->GetMaximum() );
       h->Draw();
 
-      // fit
-      const auto entries( h->GetEntries() );
-      std::cout << "DeltaRPhi - layer: " << layerIndex << " entries: " << entries << std::endl;
-      if( entries )
+      if( do_fit )
       {
-        if( do_fit )
+        const auto result = std::min( Fit( h.get() ), Fit_box( h.get() ) );
+        if( result._valid )
         {
-          const auto result = std::min( Fit( h.get() ), Fit_box( h.get() ) );
-          if( result._valid )
-          {
-            auto f = result._function;
-            f->Draw("same");
-            auto h = f->GetHistogram();
+          auto f = result._function;
+          f->Draw("same");
+          auto h = f->GetHistogram();
 
-            auto mean = f->GetParameter(1);
-            auto meanError = f->GetParError(1);
-            Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+          Draw::PutText( 0.2, 0.85, Form( "entries = %.0f", entries ) );
 
-            auto rms = h->GetRMS();
-            auto error = f->GetParError(2);
-            Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+          auto mean = f->GetParameter(1);
+          auto meanError = f->GetParError(1);
+          Draw::PutText( 0.2, 0.75, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
 
-            tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
-            tgl->SetPointError( layerIndex, 0, error*1e4 );
+          tgml->SetPoint( layerIndex, layerIndex, mean );
+          tgml->SetPointError( layerIndex, 0, meanError );
 
-            tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
-            tg->SetPointError( layerIndex, 0, error*1e4 );
-          } else {
-            std::cout << "DeltaRPhi - skipping layer " << layerIndex << " (failed fit)" << std::endl;
-          }
-        } else {
-
-          auto mean = h->GetMean();
-          auto meanError = h->GetMeanError();
-          Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+          tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+          tgm->SetPointError( layerIndex, 0, meanError );
 
           auto rms = h->GetRMS();
-          auto error = h->GetRMSError();
-          Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+          auto error = f->GetParError(2);
+          Draw::PutText( 0.2, 0.65, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
 
           tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
           tgl->SetPointError( layerIndex, 0, error*1e4 );
 
           tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
           tg->SetPointError( layerIndex, 0, error*1e4 );
-
+        } else {
+          std::cout << "DeltaRPhi - skipping layer " << layerIndex << " (failed fit)" << std::endl;
         }
+
+      } else {
+
+        auto mean = h->GetMean();
+        auto meanError = h->GetMeanError();
+        Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+
+        tgml->SetPoint( layerIndex, layerIndex, mean );
+        tgml->SetPointError( layerIndex, 0, meanError );
+
+        tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+        tgm->SetPointError( layerIndex, 0, meanError );
+
+        auto rms = h->GetRMS();
+        auto error = h->GetRMSError();
+        Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+
+        tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
+        tgl->SetPointError( layerIndex, 0, error*1e4 );
+
+        tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
+        tg->SetPointError( layerIndex, 0, error*1e4 );
+
       }
 
       // draw vertical line at zero
@@ -187,16 +230,19 @@ TString DeltaRPhi( TString tag = TString() )
 
   }
 
-  // TGraph
+  // RMS vs layer
+  const double max_rms = 1.2*Utils::GetMaximum(tg);
+  // const double max_rms = 350;
+  // const double max_rms = 12000;
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
 
     std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
     h->SetMinimum(0);
-    h->SetMaximum(1.2*Utils::GetMaximum(tgl));
+    h->SetMaximum(max_rms);
     h->GetXaxis()->SetTitle( "layer id" );
-    h->GetYaxis()->SetTitle( "#sigma_{r.#Delta#phi} (track-cluster) (#mum)" );
+    h->GetYaxis()->SetTitle( "#sigma_{r.#Delta#phi} (clus-trk) (#mum)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
     h->Draw();
 
@@ -208,16 +254,17 @@ TString DeltaRPhi( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
-  // TGraph
+  // RMS vs radius
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
 
-    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
+    // std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 20, 80 ) );
     h->SetMinimum(0);
-    h->SetMaximum(1.2*Utils::GetMaximum(tg));
+    h->SetMaximum(max_rms);
     h->GetXaxis()->SetTitle( "r (cm)" );
-    h->GetYaxis()->SetTitle( "#sigma_{r.#Delta#phi} (track-cluster) (#mum)" );
+    h->GetYaxis()->SetTitle( "#sigma_{r.#Delta#phi} (clus-trk) (#mum)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
     h->Draw();
 
@@ -229,13 +276,50 @@ TString DeltaRPhi( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
-  // save everything in rootfiles
-  std::unique_ptr<TFile> output( TFile::Open( rootFile, "RECREATE" ) );
-  output->cd();
-  for( auto&& h:h_array) { if(h) h->Write(); }
-  tgl->Write();
-  tg->Write();
-  output->Close();
+  static constexpr float max_offset = 1.;
+  // static constexpr float max_offset = 0.05;
+
+  // mean vs layer
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
+    h->SetMinimum(-max_offset);
+    h->SetMaximum(max_offset);
+    h->GetXaxis()->SetTitle( "layer id" );
+    h->GetYaxis()->SetTitle( "#LTr.#Delta#phi#GT (clus-trk) (cm)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgml->SetMarkerStyle(20);
+    tgml->SetLineColor(1);
+    tgml->SetMarkerColor(1);
+    tgml->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+
+  // Mean vs radius
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
+    h->SetMinimum(-max_offset);
+    h->SetMaximum(max_offset);
+    h->GetXaxis()->SetTitle( "r (cm)" );
+    h->GetYaxis()->SetTitle( "#LTr.#Delta#phi#GT (clus-trk) (cm)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgm->SetMarkerStyle(20);
+    tgm->SetLineColor(1);
+    tgm->SetMarkerColor(1);
+    tgm->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
 
   if( true )
   {
@@ -253,6 +337,14 @@ TString DeltaRPhi( TString tag = TString() )
     std::cout << "DeltaRPhi - maximum: " << maximum << std::endl;
 
   }
+
+  // save everything in rootfiles
+  RootFile output( rootFile );
+  for( auto&& h:h_array) { output.Add( h.release() ); }
+  output.Add( tgl );
+  output.Add( tg );
+  output.Add( tgml );
+  output.Add( tgm );
 
   return pdfFile;
 

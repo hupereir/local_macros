@@ -14,18 +14,17 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 #include "Fit.C"
 
 //____________________________________________________________________________
-TString DeltaZ_truth( TString tag = TString() )
+TString DeltaZ_truth()
 {
 
   set_style( false );
 
-  std::array<float, nDetectors> max_det_residual = { 0.005, 0.015, 0.25, 0.25, 0.4, 0.4 };
+  std::array<float, nDetectors> max_det_residual = { 0.005, 0.1, 0.25, 0.25, 0.4, 0.4 };
 
-  //   if( tag.IsNull() ) tag = "_new" ;
-  //   const TString inputFile = Form( "DST/dst_eval%s.root", tag.Data() );
-
-  if( tag.IsNull() ) tag = "_realistic_full_micromegas" ;
-  const TString inputFile = Form( "DST/CONDOR%s/dst_eval%s_1*.root", tag.Data(), tag.Data() );
+  // input files
+  // const TString tag = "_acts_full_nodistortion_new";
+  const TString tag = "_genfit_full_nodistortion_new";
+  const TString inputFile = Form( "DST/CONDOR_realistic_micromegas/dst_reco%s/dst_reco*_?.root", tag.Data() );
 
   const TString pdfFile = Form( "Figures/DeltaZ_truth%s.pdf", tag.Data() );
   const TString rootFile  = Form( "Rootfiles/DeltaZ_truth%s.root", tag.Data() );
@@ -49,9 +48,10 @@ TString DeltaZ_truth( TString tag = TString() )
   const TCut momentum_cut = ("_tracks._pt>0.5" );
   const TCut pattern_cut(
     "_tracks._truth_pt>0.5"
-    "&&_tracks._nclusters_mvtx>0"
+    "&&_tracks._nclusters_mvtx>=2"
     "&&_tracks._nclusters_intt>=2"
-    "&&_tracks._nclusters_micromegas==2");
+//     "&&_tracks._nclusters_micromegas>=2"
+    );
 
   // create TGraph to store resolution vs layer
   auto tg = new TGraphErrors();
@@ -60,6 +60,14 @@ TString DeltaZ_truth( TString tag = TString() )
   // create TGraph to store resolution vs layer
   auto tgl = new TGraphErrors();
   tgl->SetName( "residuals_layers" );
+
+  // create TGraph to store mean vs layer
+  auto tgm = new TGraphErrors();
+  tgm->SetName( "residuals mean" );
+
+  // create TGraph to store mean vs radius
+  auto tgml = new TGraphErrors();
+  tgml->SetName( "residuals_layers mean" );
 
   // optimize max residual
   for( int idet = 0; idet < nDetectors; ++idet )
@@ -74,7 +82,7 @@ TString DeltaZ_truth( TString tag = TString() )
     {
       std::unique_ptr<TH1> h1( new TH1F( hname, "", 500, -max_det_residual[idet], max_det_residual[idet] ) );
       Utils::TreeToHisto( tree, hname, var, momentum_cut&&layer_cut&&pattern_cut, false );
-      max_det_residual[idet] = 5*h1->GetRMS() + std::abs( h1->GetMean() );;
+      max_det_residual[idet] = 5*h1->GetRMS() + std::abs( h1->GetMean() );
     }
   }
 
@@ -106,6 +114,11 @@ TString DeltaZ_truth( TString tag = TString() )
       const auto hname = Form( "h_%i", layerIndex );
       std::unique_ptr<TH1> h( h2d->ProjectionY( hname, ilayer+1, ilayer+1 ) );
       h->SetTitle( hname );
+
+      const auto entries( h->GetEntries() );
+      std::cout << "DeltaRPhi_truth - layer: " << layerIndex << " entries: " << entries << std::endl;
+      if( !entries ) continue;
+
       h->SetLineColor( 1 );
       h->SetMarkerColor( 1 );
       h->GetXaxis()->SetTitle( "#Deltaz_{track-truth} (cm)" );
@@ -116,53 +129,62 @@ TString DeltaZ_truth( TString tag = TString() )
       h->Draw();
 
       // fit
-      const auto entries( h->GetEntries() );
-      std::cout << "DeltaRPhi_truth - layer: " << layerIndex << " entries: " << entries << std::endl;
-      if( entries )
+      if( do_fit )
       {
-        if( do_fit )
+        //           const auto result = std::min( Fit( h.get() ), Fit_box( h.get() ) );
+        const auto result = idet == 6 ?
+          Fit_double(h.get()):
+          std::min( Fit(h.get()), Fit_box(h.get()));
+        if( result._valid )
         {
-//           const auto result = std::min( Fit( h.get() ), Fit_box( h.get() ) );
-          const auto result = idet == 6 ?
-            Fit_double(h.get()):
-            std::min( Fit(h.get()), Fit_box(h.get()));
-          if( result._valid )
-          {
-            auto f = result._function;
-            f->Draw("same");
-            auto h = f->GetHistogram();
+          auto f = result._function;
+          f->Draw("same");
+          auto h = f->GetHistogram();
 
-            auto mean = f->GetParameter(1);
-            auto meanError = f->GetParError(1);
-            Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+          Draw::PutText( 0.2, 0.85, Form( "entries = %.0f", entries ) );
 
-            auto rms = h->GetRMS();
-            auto error = f->GetParError(2);
-            Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+          auto mean = f->GetParameter(1);
+          auto meanError = f->GetParError(1);
+          Draw::PutText( 0.2, 0.75, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
 
-            tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
-            tgl->SetPointError( layerIndex, 0, error*1e4 );
+          tgml->SetPoint( layerIndex, layerIndex, mean );
+          tgml->SetPointError( layerIndex, 0, meanError );
 
-            tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
-            tg->SetPointError( layerIndex, 0, error*1e4 );
-          } else {
-            std::cout << "DeltaZ_truth - skipping layer " << layerIndex << " (failed fit)" << std::endl;
-          }
-        } else {
-          auto mean = h->GetMean();
-          auto meanError = h->GetMeanError();
-          Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+          tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+          tgm->SetPointError( layerIndex, 0, meanError );
 
           auto rms = h->GetRMS();
-          auto error = h->GetRMSError();
-          Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+          auto error = f->GetParError(2);
+          Draw::PutText( 0.2, 0.65, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
 
           tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
           tgl->SetPointError( layerIndex, 0, error*1e4 );
 
           tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
           tg->SetPointError( layerIndex, 0, error*1e4 );
+        } else {
+          std::cout << "DeltaZ_truth - skipping layer " << layerIndex << " (failed fit)" << std::endl;
         }
+      } else {
+        auto mean = h->GetMean();
+        auto meanError = h->GetMeanError();
+        Draw::PutText( 0.2, 0.8, Form( "mean = %.3g #pm %.3g #mum", mean*1e4, meanError*1e4 ) );
+
+        tgml->SetPoint( layerIndex, layerIndex, mean );
+        tgml->SetPointError( layerIndex, 0, meanError );
+
+        tgm->SetPoint( layerIndex, radius[layerIndex], mean );
+        tgm->SetPointError( layerIndex, 0, meanError );
+
+        auto rms = h->GetRMS();
+        auto error = h->GetRMSError();
+        Draw::PutText( 0.2, 0.7, Form( "#sigma = %.3g #pm %.3g #mum", rms*1e4, error*1e4 ) );
+
+        tgl->SetPoint( layerIndex, layerIndex, rms*1e4 );
+        tgl->SetPointError( layerIndex, 0, error*1e4 );
+
+        tg->SetPoint( layerIndex, radius[layerIndex], rms*1e4 );
+        tg->SetPointError( layerIndex, 0, error*1e4 );
       }
 
       // draw vertical line at zero
@@ -179,7 +201,7 @@ TString DeltaZ_truth( TString tag = TString() )
 
   }
 
-  // TGraph
+  // RMS vs layer
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
@@ -187,6 +209,7 @@ TString DeltaZ_truth( TString tag = TString() )
     std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
     h->SetMinimum(0);
     h->SetMaximum(1.2*Utils::GetMaximum(tgl));
+    h->SetMaximum(400);
     h->GetXaxis()->SetTitle( "layer id" );
     h->GetYaxis()->SetTitle( "#sigma_{#Deltaz} (track-truth) (#mum)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
@@ -200,7 +223,7 @@ TString DeltaZ_truth( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
-  // TGraph
+  // RMS vs radius
   {
     std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
     cv->SetLeftMargin( 0.16 );
@@ -209,6 +232,7 @@ TString DeltaZ_truth( TString tag = TString() )
     std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 20, 80 ) );
     h->SetMinimum(0);
     h->SetMaximum(1.2*Utils::GetMaximum(tg));
+    h->SetMaximum(400);
     h->GetXaxis()->SetTitle( "r (cm)" );
     h->GetYaxis()->SetTitle( "#sigma_{#Deltaz} (track-truth) (#mum)" );
     h->GetYaxis()->SetTitleOffset( 1.6 );
@@ -222,13 +246,58 @@ TString DeltaZ_truth( TString tag = TString() )
     pdfDocument.Add( cv.get() );
   }
 
+  // static constexpr float max_offset = 1.;
+  static constexpr float max_offset = 0.05;
+
+  // mean vs layer
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtgl", "cvtgl", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, nLayersTotal ) );
+    h->SetMinimum(-max_offset);
+    h->SetMaximum(max_offset);
+    h->GetXaxis()->SetTitle( "layer id" );
+    h->GetYaxis()->SetTitle( "#LTr.#Deltaz#GT (track-truth) (cm)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgml->SetMarkerStyle(20);
+    tgml->SetLineColor(1);
+    tgml->SetMarkerColor(1);
+    tgml->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+
+  // Mean vs radius
+  {
+    std::unique_ptr<TCanvas> cv( new TCanvas( "cvtg", "cvtg", 800, 600 ) );
+    cv->SetLeftMargin( 0.16 );
+
+    std::unique_ptr<TH1> h( new TH1F( "dummy", "", 100, 0, 90 ) );
+    h->SetMinimum(-max_offset);
+    h->SetMaximum(max_offset);
+    h->GetXaxis()->SetTitle( "r (cm)" );
+    h->GetYaxis()->SetTitle( "#LTr.#Deltaz#GT (track-truth) (cm)" );
+    h->GetYaxis()->SetTitleOffset( 1.6 );
+    h->Draw();
+
+    tgm->SetMarkerStyle(20);
+    tgm->SetLineColor(1);
+    tgm->SetMarkerColor(1);
+    tgm->Draw("P");
+
+    pdfDocument.Add( cv.get() );
+  }
+
   // save everything in rootfiles
-  std::unique_ptr<TFile> output( TFile::Open( rootFile, "RECREATE" ) );
-  output->cd();
-  for( auto&& h:h_array) { if(h) h->Write(); }
-  tgl->Write();
-  tg->Write();
-  output->Close();
+  RootFile output( rootFile );
+  for( auto&& h:h_array) { output.Add( h.release() ); }
+  output.Add( tgl );
+  output.Add( tg );
+  output.Add( tgml );
+  output.Add( tgm );
 
   if( true )
   {

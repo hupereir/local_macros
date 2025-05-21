@@ -1,4 +1,4 @@
-#include <RootUtil/Draw.h> 
+#include <RootUtil/Draw.h>
 #include <RootUtil/FileManager.h>
 #include <RootUtil/PdfDocument.h>
 #include <RootUtil/Utils.h>
@@ -15,8 +15,13 @@ R__LOAD_LIBRARY(libRootUtilBase.so)
 static constexpr int isec_rec = 3;
 static constexpr double phi_rec = isec_rec*M_PI/6 + M_PI/12;
 
-static constexpr double z_rec = 5;
-static constexpr double r_rec = 70;
+static constexpr double z_rec = 15;
+static constexpr double r_rec = 60;
+
+namespace
+{
+  int GetRangeBins( TAxis* axis ) { return axis->GetLast() - axis->GetFirst() + 1; }
+}
 
 //_______________________________________________
 TString DrawDistortionCorrection_phi()
@@ -24,24 +29,37 @@ TString DrawDistortionCorrection_phi()
 
   set_style( false );
 
-  // open TFile  
-  const TString tag = "_full_realistic_micromegas_truth";
 
-  auto f = TFile::Open( Form( "Rootfiles/Distortions%s.root", tag.Data() ) );
-  // auto f = TFile::Open( Form( "distortion_maps_rec/Distortions%s.root", tag.Data() ) );
+  const TString tag = "_extrapolated";
+  const TString inputFile = "distortion_maps/average_minus_static_distortion_extrapolated.root";
+  const auto mapfile = "distortion_maps/average_minus_static_distortion_converted.root";
+  // const auto mapfile = "distortion_maps/empty.root";
+
+  const TString pdfFile( Form( "Figures/DistortionCorrection_phi%s.pdf", tag.Data() ) );
+
+  std::cout << "DrawDistortionCorrection - input file: " << inputFile << std::endl;
+  std::cout << "DrawDistortionCorrection - mapfile: " << mapfile << std::endl;
+  std::cout << "DrawDistortionCorrection - pdfFile: " << pdfFile << std::endl;
+
+  PdfDocument pdfDocument( pdfFile );
+
+  const bool addLimits = false;
+  const bool useRange = false;
+
+  auto f = TFile::Open( inputFile );
   if( !f ) return TString();
 
   // load histograms
-  #if true
+  #if false
   auto hentries = dynamic_cast<TH3*>(f->Get("hentries_rec"));
   auto hDistortionP_rec = dynamic_cast<TH3*>(f->Get("hDistortionP_rec"));
   auto hDistortionR_rec = dynamic_cast<TH3*>(f->Get("hDistortionR_rec"));
   auto hDistortionZ_rec = dynamic_cast<TH3*>(f->Get("hDistortionZ_rec"));
   #else
   auto hentries = dynamic_cast<TH3*>(f->Get("hentries"));
-  auto hDistortionP_rec = dynamic_cast<TH3*>(f->Get("hIntDistortionP"));
-  auto hDistortionR_rec = dynamic_cast<TH3*>(f->Get("hIntDistortionR"));
-  auto hDistortionZ_rec = dynamic_cast<TH3*>(f->Get("hIntDistortionZ"));
+  auto hDistortionP_rec = dynamic_cast<TH3*>(f->Get("hIntDistortionP_posz"));
+  auto hDistortionR_rec = dynamic_cast<TH3*>(f->Get("hIntDistortionR_posz"));
+  auto hDistortionZ_rec = dynamic_cast<TH3*>(f->Get("hIntDistortionZ_posz"));
   #endif
 
   if( hDistortionP_rec ) hDistortionP_rec->SetName( "hDistortionP_rec" );
@@ -78,38 +96,42 @@ TString DrawDistortionCorrection_phi()
     }
   }
 
-  auto f2 = TFile::Open( "distortion_maps/fluct_average.rev3.1side.3d.file0.h_negz.real_B1.4_E-400.0.ross_phi1_sphenix_phislice_lookup_r26xp40xz40.distortion_map.hist.root" );
-  // auto f2 = TFile::Open( "distortion_maps/average.rev3.1side.3d.file0.h_negz.real_B1.4_E-400.0.ross_phi1_sphenix_phislice_lookup_r26xp40xz40.distortion_map.hist.root" );
+  auto f2 = TFile::Open( mapfile );
   if( !f2 ) return TString();
 
   // load histograms
-  auto hDRint= dynamic_cast<TH3*>(f2->Get("hIntDistortionR"));
-  auto hDPint= dynamic_cast<TH3*>(f2->Get("hIntDistortionP"));
-  auto hDZint= dynamic_cast<TH3*>(f2->Get("hIntDistortionZ"));
+  auto hDRint= dynamic_cast<TH3*>(f2->Get("hIntDistortionR_posz"));
+  auto hDPint= dynamic_cast<TH3*>(f2->Get("hIntDistortionP_posz"));
+  auto hDZint= dynamic_cast<TH3*>(f2->Get("hIntDistortionZ_posz"));
   Utils::PrintAxis( hDPint );
 
   // find relevant input bins
   int zbin_in_min = 0;
   int zbin_in_max = 0;
+  int zbin_in = 0;
 
   int rbin_in_min = 0;
   int rbin_in_max = 0;
+  int rbin_in = 0;
 
   for( const auto h: {hDRint, hDPint, hDZint} )
   {
     if( h )
     {
       if( z_rec < 0 )
-      {      
+      {
         zbin_in_min = h->GetZaxis()->FindBin( -z_rec_max )+1;
         zbin_in_max = h->GetZaxis()->FindBin( -z_rec_min );
+        zbin_in = h->GetZaxis()->FindBin( -z_rec );
       } else {
         zbin_in_min = h->GetZaxis()->FindBin( z_rec_min )+1;
         zbin_in_max = h->GetZaxis()->FindBin( z_rec_max );
+        zbin_in = h->GetZaxis()->FindBin( z_rec );
       }
 
       rbin_in_min = h->GetYaxis()->FindBin( r_rec_min )+1;
       rbin_in_max = h->GetYaxis()->FindBin( r_rec_max );
+      rbin_in =  h->GetYaxis()->FindBin( r_rec );
       break;
     }
   }
@@ -118,84 +140,38 @@ TString DrawDistortionCorrection_phi()
   std::cout << "DrawDistortionCorrection - zbin_rec: " << zbin_rec << " zbin_in: (" << zbin_in_min << ", " << zbin_in_max << ")" << std::endl;
   std::cout << "DrawDistortionCorrection - rbin_rec: " << rbin_rec << " rbin_in: (" << rbin_in_min << ", " << rbin_in_max << ")" << std::endl;
 
-  // pdf output
-  TString pdfFile( Form( "Figures/DistortionCorrection_phi%s.pdf", tag.Data() ) );
-  PdfDocument pdfDocument( pdfFile );
+  // histogram pairs, for comparison
+  using histogram_struct_t = std::tuple<TString, TH3*, TH3*>;
+  std::array<histogram_struct_t, 3> histogram_pairs = {{
+    { "r#Delta#phi (cm)", hDPint, hDistortionP_rec },
+    { "#Deltar (cm)", hDRint, hDistortionR_rec },
+    { "#Deltaz (cm)", hDZint, hDistortionZ_rec }
+  }};
 
-  if( true )
+  auto cv( new TCanvas( "cv", "cv", 900, 350 ) );
+  cv->Divide( 3, 1 );
+  int cv_id = 0;
+
+  for( const auto& [label, hint, hDistortion_rec]:histogram_pairs )
   {
-    // rdphi
-    auto cv( new TCanvas( "cv3", "cv1", 800, 800 ) );
-    cv->SetLeftMargin( 0.15 );
-    if( hDPint )
+    cv->cd(++cv_id);
+    gPad->SetLeftMargin( 0.15 );
+    if( hint )
     {
-      // deltaR vs R and z
-      hDPint->GetYaxis()->SetRange( (rbin_in_min+rbin_in_max)/2, (rbin_in_min+rbin_in_max)/2 );
-      hDPint->GetZaxis()->SetRange( zbin_in_min, zbin_in_max );
-      auto proj = hDPint->Project3D( "x" );
-      proj->Scale( 1./(zbin_in_max-zbin_in_min+1) );
+      if( useRange )
+      {
+        hint->GetYaxis()->SetRange( rbin_in_min, rbin_in_max );
+        hint->GetZaxis()->SetRange( zbin_in_min, zbin_in_max );
+      } else {
+        hint->GetYaxis()->SetRange( rbin_in, rbin_in );
+        hint->GetZaxis()->SetRange( zbin_in, zbin_in );
+      }
+
+      auto proj = hint->Project3D( "x" );
+      proj->Scale( 1./(GetRangeBins(hint->GetYaxis())*GetRangeBins(hint->GetZaxis())) );
       proj->SetTitle("");
-      proj->GetXaxis()->SetTitle( "#phi (rad)" );
-      proj->GetYaxis()->SetTitle( "r#Delta#phi (cm)" );
-
-      // need to set errors to zero
-      for( int i = 0; i < proj->GetNbinsX(); ++i )
-      { proj->SetBinError( i+1, 0 ); }
-
-      proj->SetMarkerStyle( 20 );
-      proj->SetMarkerColor( 1 );
-      proj->SetLineColor(1);
-
-//       proj->SetMinimum( -0.35 );
-//       proj->SetMaximum( -0.3 );
-
-      proj->SetMinimum( (proj->GetMinimum() > 0 ? 0.8:1.2)*proj->GetMinimum() );
-      proj->SetMaximum( (proj->GetMaximum() > 0 ? 1.2:0.8)*proj->GetMaximum() );
-
-      proj->Draw( "P" );
-
-      Draw::PutText( 0.6, 0.6, Form( "z = %.2f cm", z_rec ) );
-      Draw::PutText( 0.6, 0.8, Form( "r = %.2f cm", r_rec ) );
-      
-    }
-
-    if( hDistortionP_rec )
-    {
-      hDistortionP_rec->GetYaxis()->SetRange( rbin_rec, rbin_rec ); // r axis
-      hDistortionP_rec->GetZaxis()->SetRange( zbin_rec, zbin_rec ); // z axis
-      auto proj = hDistortionP_rec->Project3D( "x" );
-      proj->SetMarkerStyle(20);
-      proj->SetMarkerColor( 2 );
-      proj->SetLineColor(2);
-      proj->Draw( "same" );
-    }
-    
-    {
-      auto line = Draw::VerticalLine( cv, phi_rec );
-      line->SetLineColor( 2 );
-      line->Draw();
-    }
-      
-    pdfDocument.Add(cv);
-  }
-
-  if( true )
-  {
-    // dr corrections
-    TCanvas* cv( new TCanvas( "cv4", "cv1", 800, 800 ) );
-    cv->SetLeftMargin( 0.15 );
-    if( hDRint )
-    {
-      hDRint->GetYaxis()->SetRange( (rbin_in_min+rbin_in_max)/2, (rbin_in_min+rbin_in_max)/2 );
-      hDRint->GetZaxis()->SetRange( zbin_in_min, zbin_in_max );
-
-      // deltaR vs R and z
-      auto proj = hDRint->Project3D( "x" );
-      proj->Scale( 1./(zbin_in_max-zbin_in_min+1) );
-      proj->SetTitle("");
-      proj->GetXaxis()->SetTitle( "#phi (rad)" );
-      proj->GetYaxis()->SetTitle( "#Deltar (cm)" );
       proj->GetYaxis()->SetTitleOffset( 1.5 );
+      proj->GetYaxis()->SetTitle( label );
 
       // need to set errors to zero
       for( int i = 0; i < proj->GetNbinsX(); ++i )
@@ -205,24 +181,27 @@ TString DrawDistortionCorrection_phi()
       proj->SetMarkerColor( 1 );
       proj->SetLineColor(1);
 
+//       if( addLimits )
+//       {
+//         proj->SetMinimum( std::min( proj->GetMinimum(), -0.1 ));
+//         proj->SetMaximum( std::max( proj->GetMaximum(), 0.1 ));
+//       }
+
       proj->SetMinimum( (proj->GetMinimum() > 0 ? 0.8:1.2)*proj->GetMinimum() );
       proj->SetMaximum( (proj->GetMaximum() > 0 ? 1.2:0.8)*proj->GetMaximum() );
 
       proj->Draw( "P" );
 
-      Draw::PutText( 0.6, 0.6, Form( "z = %.2f cm", z_rec ) );
-      Draw::PutText( 0.6, 0.8, Form( "r = %.2f cm", r_rec ) );
-
-//       Draw::HorizontalLine( cv, 0 )->Draw();
-//       Draw::VerticalLine( cv, 30 )->Draw();
+      Draw::PutText( 0.6, 0.8, Form( "z = %.2f cm", z_rec ) );
+      Draw::PutText( 0.6, 0.85, Form( "r = %.2f cm", r_rec ) );
 
     }
 
-    if( hDistortionR_rec )
+    if( hDistortion_rec )
     {
-      hDistortionR_rec->GetYaxis()->SetRange( rbin_rec, rbin_rec ); // z axis
-      hDistortionR_rec->GetZaxis()->SetRange( zbin_rec, zbin_rec ); // z axis
-      auto proj = hDistortionR_rec->Project3D( "x" );
+      hDistortion_rec->GetYaxis()->SetRange( rbin_rec, rbin_rec ); // r axis
+      hDistortion_rec->GetZaxis()->SetRange( zbin_rec, zbin_rec ); // z axis
+      auto proj = hDistortion_rec->Project3D( "x" );
       proj->SetMarkerStyle(20);
       proj->SetMarkerColor( 2 );
       proj->SetLineColor(2);
@@ -235,65 +214,8 @@ TString DrawDistortionCorrection_phi()
       line->Draw();
     }
 
-    pdfDocument.Add(cv);
   }
 
-  if( true )
-  {
-    // dr corrections
-    TCanvas* cv( new TCanvas( "cv5", "cv1", 800, 800 ) );
-    cv->SetLeftMargin( 0.15 );
-
-    if( hDZint )
-    {
-      hDZint->GetYaxis()->SetRange( (rbin_in_min+rbin_in_max)/2, (rbin_in_min+rbin_in_max)/2 );
-      hDZint->GetZaxis()->SetRange( zbin_in_min, zbin_in_max );
-
-      // deltaR vs R and z
-      auto proj = hDZint->Project3D( "x" );
-      proj->Scale( 1./(zbin_in_max-zbin_in_min+1) );
-      proj->SetTitle("");
-      proj->GetXaxis()->SetTitle( "#phi (rad)" );
-      proj->GetYaxis()->SetTitle( "#Deltaz (cm)" );
-      proj->GetYaxis()->SetTitleOffset( 1.5 );
-
-      // need to set errors to zero
-      for( int i = 0; i < proj->GetNbinsX(); ++i )
-      { proj->SetBinError( i+1, 0 ); }
-
-      proj->SetMarkerStyle( 20 );
-      proj->SetMarkerColor( 1 );
-      proj->SetLineColor(1);
-
-      proj->SetMinimum( (proj->GetMinimum() > 0 ? 0.8:1.2)*proj->GetMinimum() );
-      proj->SetMaximum( (proj->GetMaximum() > 0 ? 1.2:0.8)*proj->GetMaximum() );
-
-      proj->Draw( "P" );
-
-      Draw::PutText( 0.6, 0.6, Form( "z = %.2f cm", z_rec ) );
-      Draw::PutText( 0.6, 0.8, Form( "r = %.2f cm", r_rec ) );
-
-    }
-
-    if( hDistortionZ_rec )
-    {
-      hDistortionZ_rec->GetYaxis()->SetRange( rbin_rec, rbin_rec ); // z axis
-      hDistortionZ_rec->GetZaxis()->SetRange( zbin_rec, zbin_rec ); // z axis
-      auto proj = hDistortionZ_rec->Project3D( "x" );
-      proj->SetMarkerStyle(20);
-      proj->SetMarkerColor( 2 );
-      proj->SetLineColor(2);
-      proj->Draw( "same" );
-    }
-
-    {
-      auto line = Draw::VerticalLine( cv, phi_rec );
-      line->SetLineColor( 2 );
-      line->Draw();
-    }
-
-    pdfDocument.Add(cv);
-  }
-
+  pdfDocument.Add(cv);
   return pdfFile;
 }
