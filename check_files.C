@@ -1,0 +1,52 @@
+#include <RootUtil/Draw.h>
+#include <RootUtil/FileManager.h>
+#include <RootUtil/PdfDocument.h>
+#include <RootUtil/Utils.h>
+
+#include <TCanvas.h>
+#include <TChain.h>
+#include <TCut.h>
+#include <TGraphErrors.h>
+#include <TH1.h>
+#include <TH2.h>
+
+#include "LayerDefines.h"
+#include "Fit.C"
+
+#include <trackbase/TrkrClusterContainer.h>
+
+R__LOAD_LIBRARY(libRootUtilBase.so)
+
+
+void check_files()
+{
+
+  set_style( false );
+  gStyle->SetOptStat(0);
+
+  using data_type_pair_t = std::pair<int, std::string>;
+  using data_list_t = std::vector<data_type_pair_t>;
+  data_list_t data_list =
+  {
+    { 11, "_single_electron" },
+    { -11, "_single_positron" },
+    { 211, "_single_piplus" },
+    { -211, "_single_piminus" },
+    { 321, "_single_kplus" },
+    { -321, "_single_kminus" },
+    { 2212, "_single_proton" },
+    { -2212, "_single_antiproton" }
+  };
+
+  const std::string global_tag = "";
+
+  for( const auto& [pid, tag]:data_list )
+  {
+
+    const TString inputFile = Form( "DST/CONDOR%s/DST_RECO%s/dst_reco*.root", tag.c_str(), global_tag.c_str() );
+    FileManager fileManager( inputFile );
+    std::cout << "check_files - tag: " << tag << " files: " << fileManager.GetNFiles() << std::endl;
+  }
+
+  return;
+}

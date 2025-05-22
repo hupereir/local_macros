@@ -1,0 +1,80 @@
+#include <RootUtil/Draw.h>
+#include <RootUtil/FileManager.h>
+#include <RootUtil/PdfDocument.h>
+#include <RootUtil/Utils.h>
+
+#include <TCanvas.h>
+#include <TChain.h>
+#include <TCut.h>
+#include <TGraphErrors.h>
+#include <TH1.h>
+#include <TH2.h>
+
+#include "LayerDefines.h"
+#include "Fit.C"
+
+#include <trackbase/TrkrClusterContainer.h>
+
+R__LOAD_LIBRARY(libRootUtilBase.so)
+
+
+TString e_over_p()
+{
+
+  set_style( false );
+  // gStyle->SetOptStat(0);
+
+  using data_type_pair_t = std::pair<int, std::string>;
+  using data_list_t = std::vector<data_type_pair_t>;
+  data_list_t data_list =
+  {
+    { 11, "_single_electron" },
+    { -11, "_single_positron" },
+    { 211, "_single_piplus" },
+    { -211, "_single_piminus" },
+    { 321, "_single_kplus" },
+    { -321, "_single_kminus" },
+    { 2212, "_single_proton" },
+    { -2212, "_single_antiproton" }
+  };
+
+  const std::string global_tag = "_lpt";
+
+  // pdf document
+  const TString pdfFile = Form( "Figures/e_over_p_all%s.pdf", global_tag.c_str());
+  PdfDocument pdfDocument( pdfFile );
+
+  // create canvas
+  auto cv( new TCanvas( "cv", "cv", 1200, 800 ) );
+  cv->Divide(4,2);
+
+  int cvid = 0;
+  for( const auto& [pid, tag]:data_list )
+  {
+
+    const TString inputFile = Form( "DST/CONDOR%s/DST_RECO%s/dst_reco*.root", tag.c_str(), global_tag.c_str() );
+
+    FileManager fileManager( inputFile );
+    auto tree = fileManager.GetChain( "T" );
+    if( !tree ) { continue; }
+
+    const TString var( "_tracks._calo_clusters._e/_tracks._p" );
+    const TCut cut = "_tracks._calo_clusters._layer == 1";
+    const TCut pid_cut = Form("_tracks._pid == %i", pid);
+
+    auto h = new TH1F( Form("e_over_p_%s", tag.c_str()), "", 100, 0, 3 );
+    Utils::TreeToHisto( tree, h->GetName(), var, cut&&pid_cut, false );
+    h->SetTitle(tag.c_str());
+    h->SetFillStyle(1001);
+    h->SetFillColor(kYellow );
+    // h->SetStats(false);
+    h->GetXaxis()->SetTitle( "E/p" );
+
+    cv->cd(++cvid);
+    h->Draw();
+  }
+
+  pdfDocument.Add(cv);
+
+  return pdfFile;
+}

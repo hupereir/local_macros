@@ -6,7 +6,7 @@ namespace
 {
 
   // global variables
-  TrackingEvaluator_hp::Container* container = nullptr;
+  SimEvaluator_hp::Container* container = nullptr;
   TTree* tree = nullptr;
 
   // square
@@ -24,9 +24,6 @@ void DrawEvent( int i )
 
   // load first event
   tree->GetEntry(i);
-
-  // print list of tracks
-  std::cout << "tracks: " << container->tracks().size() << std::endl;
 
   // create canvas
   TCanvas* cv = new TCanvas( "cv", "", 900, 450 );
@@ -51,17 +48,11 @@ void DrawEvent( int i )
     marker->SetMarkerColor(2);
 
     // loop over container tracks
-    for( const TrackingEvaluator_hp::TrackStruct& track:container->tracks() )
+    for( const SimEvaluator_hp::G4HitStruct& g4hit:container->g4hits() )
     {
-
-      std::cout << "PID: " << track._pid << std::endl;
-
-      // loop over track clusters
-      for( const TrackingEvaluator_hp::ClusterStruct& cluster:track._clusters )
-      {
-        marker->DrawMarker( cluster._x, cluster._y );
-      }
-
+      // skip calorimeter
+      if( g4hit._caloid >= 0 ) { continue; }
+      marker->DrawMarker( g4hit._x, g4hit._y );
     }
 
   }
@@ -73,7 +64,7 @@ void DrawEvent( int i )
     // create empty histogram to show axis
     TH2* h0 = new TH2I( "h1", "", 200, -100, 100, 200, -100, 100 );
     h0->GetXaxis()->SetTitle( "z (cm)" );
-    h0->GetYaxis()->SetTitle( "r (cm)" );
+    h0->GetYaxis()->SetTitle( "y (cm)" );
     h0->SetStats(0);
     h0->Draw();
 
@@ -84,35 +75,27 @@ void DrawEvent( int i )
     marker->SetMarkerColor(2);
 
     // loop over container tracks
-    for( const TrackingEvaluator_hp::TrackStruct& track:container->tracks() )
+    for( const SimEvaluator_hp::G4HitStruct& g4hit:container->g4hits() )
     {
+      // skip calorimeter
+      if( g4hit._caloid >= 0 ) { continue; }
 
-      std::cout << "PID: " << track._pid << std::endl;
-
-      // loop over track clusters
-      for( const TrackingEvaluator_hp::ClusterStruct& cluster:track._clusters )
-      {
-        double r = get_r( cluster._x, cluster._y );
-        if( cluster._y<0) r*=-1;
-        marker->DrawMarker( cluster._z, r );
-      }
-
+      marker->DrawMarker( g4hit._z, g4hit._y );
     }
-  }
+   }
 
 }
 
 //____________________________________________________________________________
-void ReadEvaluation()
+void ReadSimEvaluation()
 {
-  // const TString inputFile = "DST/CONDOR_upsilon_pythia8/dst_eval_upsilon_pythia8_0.root";
-  const TString inputFile = "DST/CONDOR_jpsi_pythia8/dst_eval_jpsi_pythia8_0.root";
+  const TString inputFile = "DST/CONDOR_upsilon_pythia8_tau/sim_evaluation/dst_eval_sim_evaluation_upsilon_pythia8_tau_0001.root";
 
   auto tfile = TFile::Open( inputFile );
 
   // load tree and assign branch
   tree = static_cast<TTree*>( tfile->Get("T") );
-  tree->SetBranchAddress( "DST#EVAL#TrackingEvaluator_hp::Container", &container );
+  tree->SetBranchAddress( "DST#EVAL#SimEvaluator_hp::Container", &container );
 
   DrawEvent(0);
 
